@@ -12,7 +12,7 @@ import (
 func main() {
 	cfg := config.Load()
 	sleeperClient := sleeper.New(cfg.SleeperBaseURL)
-	h := &handlers.LeagueHandler{Provider: sleeperClient}
+	h := &handlers.RosterHandler{Provider: sleeperClient}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /league/{leagueId}/rosters", h.GetRosters)
 	log.Fatal(http.ListenAndServe(":"+cfg.Port, mux))

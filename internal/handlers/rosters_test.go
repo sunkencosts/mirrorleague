@@ -19,7 +19,7 @@ func (m *mockProvider) GetRosters(leagueID string) ([]provider.Roster, error) {
 }
 
 func TestGetRosters_success(t *testing.T) {
-	h := &LeagueHandler{Provider: &mockProvider{rosters: []provider.Roster{{RosterID: 1}}}}
+	h := &RosterHandler{Provider: &mockProvider{rosters: []provider.Roster{{RosterID: 1}}}}
 	req := httptest.NewRequest("GET", "/league/test/rosters", nil)
 	req.SetPathValue("leagueId", "test")
 	w := httptest.NewRecorder()
@@ -32,7 +32,7 @@ func TestGetRosters_success(t *testing.T) {
 }
 
 func TestGetRosters_providerError(t *testing.T) {
-	h := &LeagueHandler{Provider: &mockProvider{err: errors.New("down")}}
+	h := &RosterHandler{Provider: &mockProvider{err: errors.New("down")}}
 	req := httptest.NewRequest("GET", "/league/test/rosters", nil)
 	req.SetPathValue("leagueId", "test")
 	w := httptest.NewRecorder()
