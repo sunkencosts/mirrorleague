@@ -17,6 +17,9 @@ A fantasy football "mirror" app where users can import a celebrity or public fig
 
 ## Current Status
 - [ ] Step 1 — Mirror a league (in progress)
+  - [x] `GET /league/:leagueId/rosters` — returns rosters with resolved player names, team name, and player image URLs
+  - [ ] `GET /user/:username` — returns user object + their leagues
+  - [ ] `GET /league/:leagueId/week/:week` — returns each team's lineup for that week
 - [ ] Step 2 — Reaction layer (votes, predictions)
 - [ ] Step 3 — User accounts + lineup picks
 - [ ] Step 4 — Scoring and winner declaration
@@ -32,12 +35,13 @@ A fantasy football "mirror" app where users can import a celebrity or public fig
 
 /internal
   /sleeper
-    client.go            ← all Sleeper API calls
-    models.go            ← Go structs for API responses
-    cache.go             ← player map caching (once/day, 5MB)
+    client.go            ← all Sleeper API calls (GetRosters, getLeagueUsers)
+    cache.go             ← player map caching (once/day, 5MB, saved to players.json)
   /handlers
-    user.go              ← HTTP handlers for user endpoints
-    league.go            ← HTTP handlers for league endpoints
+    rosters.go           ← HTTP handler for roster endpoint
+    rosters_test.go      ← handler tests
+  /provider
+    provider.go          ← shared interfaces and models (Player, Roster, Provider)
 
 /pkg
   /config
@@ -79,39 +83,33 @@ type SleeperClient interface {
 }
 ```
 
-### Key Models (internal/sleeper/models.go)
+### Key Models (internal/provider/provider.go)
 ```go
-type User struct {
-    UserID      string `json:"user_id"`
-    Username    string `json:"username"`
-    DisplayName string `json:"display_name"`
-    Avatar      string `json:"avatar"`
-}
-
-type League struct {
-    LeagueID        string          `json:"league_id"`
-    Name            string          `json:"name"`
-    TotalRosters    int             `json:"total_rosters"`
-    Status          string          `json:"status"`
-    Season          string          `json:"season"`
-    ScoringSettings ScoringSettings `json:"scoring_settings"`
-    RosterPositions []string        `json:"roster_positions"`
+type Player struct {
+    PlayerID         string   `json:"player_id"`
+    FirstName        string   `json:"first_name"`
+    LastName         string   `json:"last_name"`
+    Number           int      `json:"number"`
+    Age              int      `json:"age"`
+    Team             string   `json:"team"`
+    Active           bool     `json:"active"`
+    FantasyPositions []string `json:"fantasy_positions"`
+    ImageURL         string   `json:"image_url"`  // constructed from sleepercdn.com
 }
 
 type Roster struct {
     RosterID int      `json:"roster_id"`
     OwnerID  string   `json:"owner_id"`
-    Players  []string `json:"players"`
-    Starters []string `json:"starters"`
+    TeamName string   `json:"team_name"`  // from /league/:id/users metadata
+    Players  []Player `json:"players"`
+    Starters []Player `json:"starters"`
 }
+```
 
-type Matchup struct {
-    RosterID     int      `json:"roster_id"`
-    MatchupID    int      `json:"matchup_id"`
-    Starters     []string `json:"starters"`
-    Players      []string `json:"players"`
-    Points       float64  `json:"points"`
-}
+### Player Image URLs
+Sleeper doesn't return image URLs directly. Construct them from the CDN:
+```
+https://sleepercdn.com/content/nfl/players/thumb/<player_id>.jpg
 ```
 
 ### Parallel API Calls Pattern

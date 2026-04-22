@@ -1,0 +1,19 @@
+export interface Player {
+  player_id: string
+  first_name: string
+  last_name: string
+  number: number
+  age: number
+  team: string
+  active: boolean
+  fantasy_positions: string[]
+  image_url: string
+}
+
+export interface Roster {
+  roster_id: number
+  owner_id: string
+  team_name: string
+  players: Player[]
+  starters: Player[]
+}
