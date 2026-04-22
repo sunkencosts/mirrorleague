@@ -29,7 +29,7 @@ func (p *PlayerCache) Load(baseURL string) error {
 		}
 	}
 
-	resp, err := http.Get(baseURL + "/Players/nfl")
+	resp, err := http.Get(baseURL + "/players/nfl")
 	if err != nil {
 		return fmt.Errorf("fetching Players: %w", err)
 	}

@@ -19,11 +19,13 @@ type Player struct {
 	Team             string   `json:"team"`
 	Active           bool     `json:"active"`
 	FantasyPositions []string `json:"fantasy_positions"`
+	ImageURL         string   `json:"image_url"`
 }
 
 type Roster struct {
 	RosterID int      `json:"roster_id"`
 	OwnerID  string   `json:"owner_id"`
+	TeamName string   `json:"team_name"`
 	Players  []Player `json:"players"`
 	Starters []Player `json:"starters"`
 }
