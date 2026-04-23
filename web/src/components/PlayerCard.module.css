@@ -1,0 +1,28 @@
+.playerCard {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.playerCard img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #2d2d3f;
+}
+
+.playerInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.playerName {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.playerMeta {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
