@@ -22,3 +22,7 @@ export interface Roster {
   players: Player[]
   starters: Player[]
 }
+
+export interface League {
+  roster_positions: string[]
+}

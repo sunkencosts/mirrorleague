@@ -1,20 +1,27 @@
 import type { Player, SwapOption } from "../types";
 import styles from "./PlayerCard.module.css";
 
+const PROFILE_FALLBACK =
+  "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' fill='%232d2d3f'/><circle cx='12' cy='8' r='4' fill='%234a4a6a'/><path d='M5 20c0-4.2 3.5-7 7-7s7 2.8 7 7' fill='%234a4a6a'/></svg>";
+
 interface Props {
   player: Player;
+  swapLabel?: string;
   isSelected?: boolean;
   eligibleSwaps?: SwapOption[];
   onSwapClick?: () => void;
   onSwapSelect?: (opt: SwapOption) => void;
+  onMoveToEmpty?: () => void;
 }
 
 export default function PlayerCard({
   player,
+  swapLabel,
   isSelected,
   eligibleSwaps,
   onSwapClick,
   onSwapSelect,
+  onMoveToEmpty,
 }: Props) {
   return (
     <div
@@ -24,7 +31,8 @@ export default function PlayerCard({
         src={player.image_url}
         alt={`${player.first_name} ${player.last_name}`}
         onError={(e) => {
-          e.currentTarget.style.visibility = "hidden";
+          e.currentTarget.onerror = null;
+          e.currentTarget.src = PROFILE_FALLBACK;
         }}
       />
       <div className={styles.playerInfo}>
@@ -43,7 +51,7 @@ export default function PlayerCard({
           onClick={onSwapClick}
           title="Swap player"
         >
-          ⇄
+          {swapLabel ?? "⇄"}
         </button>
       )}
 
@@ -61,7 +69,8 @@ export default function PlayerCard({
                   src={opt.player.image_url}
                   alt={`${opt.player.first_name} ${opt.player.last_name}`}
                   onError={(e) => {
-                    e.currentTarget.style.visibility = "hidden";
+                    e.currentTarget.onerror = null;
+          e.currentTarget.src = PROFILE_FALLBACK;
                   }}
                 />
                 <span className={styles.dropdownName}>
@@ -75,8 +84,17 @@ export default function PlayerCard({
                 )}
               </button>
             ))
-          ) : (
-            <p className={styles.dropdownEmpty}>No eligible players on bench</p>
+          ) : !onMoveToEmpty ? (
+            <p className={styles.dropdownEmpty}>No eligible players</p>
+          ) : null}
+          {onMoveToEmpty && (
+            <button
+              type="button"
+              className={`${styles.dropdownItem} ${styles.moveToEmpty}`}
+              onClick={onMoveToEmpty}
+            >
+              Move to bench
+            </button>
           )}
         </div>
       )}

@@ -1,11 +1,13 @@
 import { useState } from "react";
-import type { Roster } from "./types";
+import type { Roster, League } from "./types";
 import RosterCard from "./components/RosterCard";
 import styles from "./App.module.css";
 
 export default function App() {
   const [leagueId, setLeagueId] = useState("1322995024962543616");
   const [rosters, setRosters] = useState<Roster[]>([]);
+  const [starterSlots, setStarterSlots] = useState<string[]>([]);
+  const [benchSlots, setBenchSlots] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -14,11 +16,20 @@ export default function App() {
     setLoading(true);
     setError(null);
     setRosters([]);
+    setStarterSlots([]);
+    setBenchSlots(0);
 
     try {
-      const res = await fetch(`/api/league/${leagueId}/rosters`);
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      const data: Roster[] = await res.json();
+      const [leagueRes, rostersRes] = await Promise.all([
+        fetch(`/api/league/${leagueId}`),
+        fetch(`/api/league/${leagueId}/rosters`),
+      ]);
+      if (!leagueRes.ok) throw new Error(`${leagueRes.status} ${leagueRes.statusText}`);
+      if (!rostersRes.ok) throw new Error(`${rostersRes.status} ${rostersRes.statusText}`);
+      const league: League = await leagueRes.json();
+      const data: Roster[] = await rostersRes.json();
+      setStarterSlots(league.roster_positions.filter((p) => p !== "BN"));
+      setBenchSlots(league.roster_positions.filter((p) => p === "BN").length);
       setRosters(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -51,7 +62,7 @@ export default function App() {
 
       <div className={styles.rosterGrid}>
         {rosters.map((roster) => (
-          <RosterCard key={roster.roster_id} roster={roster} />
+          <RosterCard key={roster.roster_id} roster={roster} starterSlots={starterSlots} benchSlots={benchSlots} />
         ))}
       </div>
     </div>
