@@ -6,18 +6,18 @@ import (
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
 
-type rosterProvider interface {
-	GetRosters(leagueID string) ([]provider.Roster, error)
+type leagueProvider interface {
+	GetLeague(leagueID string) (provider.League, error)
 }
 
-func HandleGetRosters(p rosterProvider) http.Handler {
+func HandleGetLeague(p leagueProvider) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		leagueID := r.PathValue("leagueId")
-		rosters, err := p.GetRosters(leagueID)
+		league, err := p.GetLeague(leagueID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		encode(w, r, http.StatusOK, rosters)
+		encode(w, r, http.StatusOK, league)
 	})
 }

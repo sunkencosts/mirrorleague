@@ -69,6 +69,20 @@ func (c *Client) getLeagueUsers(leagueID string) (map[string]leagueUser, error) 
 	}
 	return byID, nil
 }
+func (c *Client) GetLeague(leagueID string) (provider.League, error) {
+	url := c.baseURL + "/league/" + leagueID
+	var leagueSettings provider.League
+
+	resp, err := c.httpClient.Get(url)
+	if err != nil {
+		return provider.League{}, fmt.Errorf("getting league for leagueID %s", leagueID)
+	}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(&leagueSettings); err != nil {
+		return provider.League{}, fmt.Errorf("getting decoding league: %w", err)
+	}
+	return leagueSettings, nil
+}
 
 func (c *Client) GetRosters(leagueID string) ([]provider.Roster, error) {
 	var wg sync.WaitGroup

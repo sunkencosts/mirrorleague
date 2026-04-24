@@ -31,17 +31,21 @@ A fantasy football "mirror" app where users can import a celebrity or public fig
 ```
 /cmd
   /server
-    main.go              ← HTTP server entry point
+    main.go              ← calls run(), nothing else
+    server.go            ← run(), NewServer(), corsMiddleware()
+    routes.go            ← addRoutes() — single source of truth for all routes
+    server_test.go       ← end-to-end tests via go run() + waitForReady
 
 /internal
   /sleeper
-    client.go            ← all Sleeper API calls (GetRosters, getLeagueUsers)
+    client.go            ← all Sleeper API calls (GetRosters, GetLeague, etc.)
     cache.go             ← player map caching (once/day, 5MB, saved to players.json)
   /handlers
-    rosters.go           ← HTTP handler for roster endpoint
-    rosters_test.go      ← handler tests
+    rosters.go           ← HandleGetRosters handler maker function
+    league.go            ← HandleGetLeague handler maker function
+    encode.go            ← generic encode[T] helper
   /provider
-    provider.go          ← shared interfaces and models (Player, Roster, Provider)
+    provider.go          ← shared models (Player, Roster, League)
 
 /pkg
   /config
@@ -71,15 +75,124 @@ Base URL: `https://api.sleeper.app/v1`
 
 ## Core Go Patterns to Follow
 
-### Sleeper Client Interface
+> These patterns follow https://grafana.com/blog/how-i-write-http-services-in-go-after-13-years/
+> Do not deviate from these without a strong reason.
+
+### Server Structure
+
+`main()` does nothing except call `run()`:
 ```go
-type SleeperClient interface {
-    GetUser(username string) (*User, error)
-    GetLeagues(userID string) ([]League, error)
-    GetRosters(leagueID string) ([]Roster, error)
-    GetUsers(leagueID string) ([]LeagueUser, error)
-    GetMatchup(leagueID string, week int) ([]Matchup, error)
-    GetPlayers() (map[string]Player, error)
+func main() {
+    ctx := context.Background()
+    if err := run(ctx, os.Getenv, os.Stdout, os.Stderr); err != nil {
+        fmt.Fprintf(os.Stderr, "%s\n", err)
+        os.Exit(1)
+    }
+}
+```
+
+`run()` owns startup, dependency wiring, and graceful shutdown:
+```go
+func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writer) error {
+    ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
+    defer cancel()
+    // wire deps, call NewServer, start httpServer, WaitGroup shutdown
+}
+```
+
+`NewServer()` takes all dependencies explicitly and returns `http.Handler`:
+```go
+func NewServer(dep1 SomeType, dep2 AnotherType) http.Handler {
+    mux := http.NewServeMux()
+    addRoutes(mux, dep1, dep2)
+    var handler http.Handler = mux
+    handler = someMiddleware(handler)
+    return handler
+}
+```
+
+### Routes
+
+All routes live in `cmd/server/routes.go` — this is the single place to see the full API surface:
+```go
+func addRoutes(mux *http.ServeMux, dep1 SomeType) {
+    mux.Handle("GET /api/something", handlers.HandleSomething(dep1))
+    mux.HandleFunc("GET /healthz", handleHealthz())
+    mux.Handle("/", spaHandler("web/dist"))
+}
+```
+
+### Handler Maker Functions
+
+Each handler is a function that takes its dependencies and returns `http.Handler`. One file per handler group in `internal/handlers/`. Each file defines its own narrow interface so it only depends on what it uses:
+```go
+type somethingProvider interface {
+    GetSomething(id string) (Something, error)
+}
+
+func HandleGetSomething(p somethingProvider) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        id := r.PathValue("id")
+        thing, err := p.GetSomething(id)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+        encode(w, r, http.StatusOK, thing)
+    })
+}
+```
+
+### encode Helper
+
+Use `encode[T]` from `internal/handlers/encode.go` for all JSON responses — never write `json.NewEncoder` directly in a handler:
+```go
+encode(w, r, http.StatusOK, result)
+```
+
+### sync.Once for Lazy Initialisation
+
+Use `sync.Once` inside `NewServer` for any expensive initialisation (e.g. the player cache) that should defer until the first request rather than blocking startup:
+```go
+var (
+    once    sync.Once
+    initErr error
+)
+core := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    once.Do(func() { initErr = expensiveInit() })
+    if initErr != nil {
+        http.Error(w, "initialisation failed", http.StatusServiceUnavailable)
+        return
+    }
+    mux.ServeHTTP(w, r)
+})
+```
+
+### Testing
+
+Tests call `go run(ctx, getenv, ...)` to spin up the real server, then use `waitForReady` to poll `/healthz` before making assertions. No mocking handler interfaces — the fake external API is an `httptest.NewServer`:
+```go
+func newTestServer(t *testing.T, externalAPIHandler http.Handler) string {
+    fakeExternal := httptest.NewServer(externalAPIHandler)
+    t.Cleanup(fakeExternal.Close)
+
+    port := freePort(t)
+    getenv := func(key string) string {
+        switch key {
+        case "PORT": return port
+        case "EXTERNAL_BASE_URL": return fakeExternal.URL
+        }
+        return ""
+    }
+    ctx, cancel := context.WithCancel(context.Background())
+    t.Cleanup(cancel)
+    go run(ctx, getenv, io.Discard, io.Discard)
+
+    baseURL := "http://localhost:" + port
+    if err := waitForReady(ctx, 5*time.Second, baseURL+"/healthz"); err != nil {
+        t.Fatalf("server never became ready: %v", err)
+    }
+    return baseURL
 }
 ```
 
