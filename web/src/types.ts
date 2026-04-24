@@ -10,6 +10,11 @@ export interface Player {
   image_url: string
 }
 
+export interface SwapOption {
+  player: Player
+  isBench: boolean
+}
+
 export interface Roster {
   roster_id: number
   owner_id: string
