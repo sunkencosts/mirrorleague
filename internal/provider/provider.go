@@ -171,6 +171,8 @@ type Roster struct {
 	TeamName string   `json:"team_name"`
 	Players  []Player `json:"players"`
 	Starters []Player `json:"starters"`
+	Reserve  []Player `json:"reserve"`
+	Taxi     []Player `json:"taxi"`
 }
 type Provider interface {
 	GetRosters(leagueID string) ([]Roster, error)

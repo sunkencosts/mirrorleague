@@ -14,6 +14,8 @@ type roster struct {
 	OwnerID  string   `json:"owner_id"`
 	Players  []string `json:"players"`
 	Starters []string `json:"starters"`
+	Reserve  []string `json:"reserve"`
+	Taxi     []string `json:"taxi"`
 }
 
 type leagueUserMetadata struct {
@@ -40,7 +42,7 @@ func New(baseURL string, cache *PlayerCache) *Client {
 }
 
 func (c *Client) resolvePlayers(ids []string) []provider.Player {
-	var players []provider.Player
+	players := []provider.Player{}
 	for _, id := range ids {
 		if player, ok := c.playerCache.Get(id); ok {
 			player.ImageURL = fmt.Sprintf("https://sleepercdn.com/content/nfl/players/thumb/%s.jpg", player.PlayerID)
@@ -129,6 +131,8 @@ func (c *Client) GetRosters(leagueID string) ([]provider.Roster, error) {
 			TeamName: teamName,
 			Players:  c.resolvePlayers(r.Players),
 			Starters: c.resolvePlayers(r.Starters),
+			Reserve:  c.resolvePlayers(r.Reserve),
+			Taxi:     c.resolvePlayers(r.Taxi),
 		})
 	}
 
