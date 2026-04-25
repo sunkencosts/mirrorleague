@@ -39,9 +39,11 @@ interface Props {
   roster: Roster;
   starterSlots: string[];
   benchSlots: number;
+  irSlots: number;
+  taxiSlots: number;
 }
 
-export default function RosterCard({ roster, starterSlots, benchSlots }: Props) {
+export default function RosterCard({ roster, starterSlots, benchSlots, irSlots, taxiSlots }: Props) {
   const [localStarters, setLocalStarters] = useState<(Player | null)[]>(
     () => Array.from({ length: starterSlots.length }, (_, i) => roster.starters[i] ?? null),
   );
@@ -184,6 +186,42 @@ export default function RosterCard({ roster, starterSlots, benchSlots }: Props) 
           ))}
         </div>
       </div>
+
+      {irSlots > 0 && (
+        <div className={styles.section}>
+          <h3 className={styles.sectionLabel}>IR · {roster.reserve.length}/{irSlots}</h3>
+          <div className={styles.playerList}>
+            {roster.reserve.map((player) => (
+              <PlayerCard key={player.player_id} player={player} />
+            ))}
+            {Array.from({ length: Math.max(0, irSlots - roster.reserve.length) }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: empty placeholder rows have no identity
+              <div key={`ir-empty-${i}`} className={styles.emptyStarterRow}>
+                <div className={styles.emptyAvatar} />
+                <span className={styles.emptyLabel}>Empty</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {taxiSlots > 0 && (
+        <div className={styles.section}>
+          <h3 className={styles.sectionLabel}>Taxi · {roster.taxi.length}/{taxiSlots}</h3>
+          <div className={styles.playerList}>
+            {roster.taxi.map((player) => (
+              <PlayerCard key={player.player_id} player={player} />
+            ))}
+            {Array.from({ length: Math.max(0, taxiSlots - roster.taxi.length) }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: empty placeholder rows have no identity
+              <div key={`taxi-empty-${i}`} className={styles.emptyStarterRow}>
+                <div className={styles.emptyAvatar} />
+                <span className={styles.emptyLabel}>Empty</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {selectedIndex !== null && (
         <button

@@ -8,6 +8,8 @@ export default function App() {
   const [rosters, setRosters] = useState<Roster[]>([]);
   const [starterSlots, setStarterSlots] = useState<string[]>([]);
   const [benchSlots, setBenchSlots] = useState(0);
+  const [irSlots, setIrSlots] = useState(0);
+  const [taxiSlots, setTaxiSlots] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,6 +20,8 @@ export default function App() {
     setRosters([]);
     setStarterSlots([]);
     setBenchSlots(0);
+    setIrSlots(0);
+    setTaxiSlots(0);
 
     try {
       const [leagueRes, rostersRes] = await Promise.all([
@@ -30,6 +34,8 @@ export default function App() {
       const data: Roster[] = await rostersRes.json();
       setStarterSlots(league.roster_positions.filter((p) => p !== "BN"));
       setBenchSlots(league.roster_positions.filter((p) => p === "BN").length);
+      setIrSlots(league.settings.reserve_slots);
+      setTaxiSlots(league.settings.taxi_slots);
       setRosters(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -62,7 +68,7 @@ export default function App() {
 
       <div className={styles.rosterGrid}>
         {rosters.map((roster) => (
-          <RosterCard key={roster.roster_id} roster={roster} starterSlots={starterSlots} benchSlots={benchSlots} />
+          <RosterCard key={roster.roster_id} roster={roster} starterSlots={starterSlots} benchSlots={benchSlots} irSlots={irSlots} taxiSlots={taxiSlots} />
         ))}
       </div>
     </div>
