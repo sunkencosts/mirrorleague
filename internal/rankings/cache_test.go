@@ -18,6 +18,9 @@ func TestNormalize(t *testing.T) {
 		{"Patrick Mahomes II", "patrick mahomes"},
 		{"Travis Kelce Jr", "travis kelce"},
 		{"A.J. Brown", "aj brown"},
+		{"Ja'Marr Chase", "jamarr chase"},
+		{"Tre' Harris", "tre harris"},
+		{"De’Zhaun Stribling", "dezhaun stribling"},
 	}
 	for _, tc := range cases {
 		if got := normalize(tc.input); got != tc.want {
@@ -26,22 +29,55 @@ func TestNormalize(t *testing.T) {
 	}
 }
 
-func TestLoad_rarityTiers(t *testing.T) {
-	// 20 QBs lets us hit every tier cleanly:
-	//   rank 1  →  5% = orange
-	//   rank 4  → 20% = purple
-	//   rank 9  → 45% = blue
-	//   rank 15 → 75% = green
-	//   rank 20 → 100% = grey
-	names := []string{
-		"Player Orange",
-		"Player Purple A", "Player Purple B", "Player Purple C",
-		"Player Blue A", "Player Blue B", "Player Blue C", "Player Blue D", "Player Blue E",
-		"Player Green A", "Player Green B", "Player Green C", "Player Green D", "Player Green E", "Player Green F",
-		"Player Grey A", "Player Grey B", "Player Grey C", "Player Grey D", "Player Grey E",
+func TestRarityFromPct(t *testing.T) {
+	cases := []struct {
+		pct  float64
+		want string
+	}{
+		{0.01, "mythic"},
+		{0.04, "orange"},
+		{0.15, "purple"},
+		{0.30, "blue"},
+		{0.60, "green"},
+		{0.90, "grey"},
 	}
+	for _, tc := range cases {
+		if got := rarityFromPct(tc.pct); got != tc.want {
+			t.Errorf("rarityFromPct(%v) = %q, want %q", tc.pct, got, tc.want)
+		}
+	}
+}
 
+func TestLoad_assignsRarity(t *testing.T) {
 	header := "fp_page,page_type,ecr_type,player,id,pos,team,ecr,sd,best,worst,sportsdata_id,player_filename,yahoo_id,cbs_id,player_owned_avg,player_owned_espn,player_owned_yahoo,player_image_url,player_square_image_url,rank_delta,bye,mergename,scrape_date,tm"
+	cols := make([]string, 25)
+	for i := range cols {
+		cols[i] = "NA"
+	}
+	cols[1] = "dynasty-wr"
+	cols[5] = "WR"
+	cols[22] = "Some Player"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, header)
+		fmt.Fprintln(w, strings.Join(cols, ","))
+	}))
+	defer srv.Close()
+
+	c := &Cache{cacheFile: filepath.Join(t.TempDir(), "rankings.json")}
+	if err := c.Load(srv.URL); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, ok := c.Get("Some Player", "WR"); !ok {
+		t.Error("Get: player not found after Load")
+	}
+}
+
+func TestLoad_topPlayerAlwaysMythic(t *testing.T) {
+	// 5 players: rank 1 = 20%, well outside the mythic % threshold.
+	// The top player should still be mythic; rank 2 should fall through to %.
+	header := "fp_page,page_type,ecr_type,player,id,pos,team,ecr,sd,best,worst,sportsdata_id,player_filename,yahoo_id,cbs_id,player_owned_avg,player_owned_espn,player_owned_yahoo,player_image_url,player_square_image_url,rank_delta,bye,mergename,scrape_date,tm"
+	names := []string{"Top QB", "Second QB", "Third QB", "Fourth QB", "Fifth QB"}
 	lines := []string{header}
 	for _, name := range names {
 		cols := make([]string, 25)
@@ -64,23 +100,10 @@ func TestLoad_rarityTiers(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 
-	cases := []struct {
-		name, pos, want string
-	}{
-		{"Player Orange", "QB", "orange"},
-		{"Player Purple A", "QB", "purple"},
-		{"Player Blue A", "QB", "blue"},
-		{"Player Green A", "QB", "green"},
-		{"Player Grey A", "QB", "grey"},
+	if got, _ := c.Get("Top QB", "QB"); got != "mythic" {
+		t.Errorf("top player: got %q, want mythic", got)
 	}
-	for _, tc := range cases {
-		got, ok := c.Get(tc.name, tc.pos)
-		if !ok {
-			t.Errorf("Get(%q, %q): not found, want %q", tc.name, tc.pos, tc.want)
-			continue
-		}
-		if got != tc.want {
-			t.Errorf("Get(%q, %q) = %q, want %q", tc.name, tc.pos, got, tc.want)
-		}
+	if got, _ := c.Get("Second QB", "QB"); got == "mythic" {
+		t.Errorf("second player should not be mythic by position rule")
 	}
 }

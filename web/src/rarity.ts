@@ -1,0 +1,22 @@
+export const RARITY_ORDER = ["mythic", "orange", "purple", "blue", "green", "grey"] as const;
+export type Rarity = (typeof RARITY_ORDER)[number];
+
+const HEX: Record<Rarity, string> = {
+  mythic: "#ffd700",
+  orange: "#f97316",
+  purple: "#a855f7",
+  blue:   "#3b82f6",
+  green:  "#22c55e",
+  grey:   "#4b5563",
+};
+
+export const RARITY_COLORS: Record<Rarity, string> = { ...HEX };
+
+export const RARITY_GLOW: Record<Rarity, string> = {
+  mythic: `0 0 0 3px ${HEX.mythic}, 0 0 14px rgba(255, 215, 0, 0.7)`,
+  orange: `0 0 0 3px ${HEX.orange}, 0 0 10px rgba(249, 115, 22, 0.6)`,
+  purple: `0 0 0 3px ${HEX.purple}, 0 0 10px rgba(168, 85, 247, 0.5)`,
+  blue:   `0 0 0 2px ${HEX.blue},   0 0  8px rgba(59, 130, 246, 0.4)`,
+  green:  `0 0 0 2px ${HEX.green},  0 0  6px rgba(34, 197, 94, 0.3)`,
+  grey:   `0 0 0 2px ${HEX.grey}`,
+};

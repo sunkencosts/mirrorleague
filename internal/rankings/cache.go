@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -26,7 +27,9 @@ var dynastyPageTypes = map[string]bool{
 
 type Cache struct {
 	players   map[string]string
-	cacheFile string // settable in tests; defaults to "rankings.json"
+	cacheFile string
+	MissLog   io.Writer
+	seen      sync.Map
 }
 
 func (c *Cache) file() string {
@@ -43,6 +46,8 @@ func cacheKey(name, pos string) string {
 func normalize(name string) string {
 	name = strings.ToLower(name)
 	name = strings.ReplaceAll(name, ".", "")
+	name = strings.ReplaceAll(name, "'", "") // straight apostrophe
+	name = strings.ReplaceAll(name, "’", "") // right single quotation mark
 	for _, suffix := range []string{" iv", " iii", " ii", " jr", " sr"} {
 		name = strings.TrimSuffix(name, suffix)
 	}
@@ -91,7 +96,11 @@ func (c *Cache) Load(csvURL string) error {
 		total := len(names)
 		for rank, name := range names {
 			pct := float64(rank+1) / float64(total)
-			c.players[cacheKey(name, pos)] = rarityFromPct(pct)
+			rarity := rarityFromPct(pct)
+			if rank == 0 {
+				rarity = "mythic"
+			}
+			c.players[cacheKey(name, pos)] = rarity
 		}
 	}
 
@@ -107,7 +116,9 @@ func (c *Cache) Load(csvURL string) error {
 
 func rarityFromPct(pct float64) string {
 	switch {
-	case pct <= 0.05:
+	case pct <= 0.02:
+		return "mythic"
+	case pct <= 0.08:
 		return "orange"
 	case pct <= 0.20:
 		return "purple"
@@ -122,5 +133,11 @@ func rarityFromPct(pct float64) string {
 
 func (c *Cache) Get(fullName, pos string) (string, bool) {
 	rarity, ok := c.players[cacheKey(fullName, pos)]
+	if !ok && c.MissLog != nil {
+		key := cacheKey(fullName, pos)
+		if _, loaded := c.seen.LoadOrStore(key, struct{}{}); !loaded {
+			fmt.Fprintf(c.MissLog, "%s|%s\n", fullName, pos)
+		}
+	}
 	return rarity, ok
 }

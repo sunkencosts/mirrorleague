@@ -1,10 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { Roster, Player, SwapOption } from "../types";
-import PlayerCard from "./PlayerCard";
+import { RARITY_ORDER, RARITY_COLORS } from "../rarity";
+import PlayerCard, { PROFILE_FALLBACK } from "./PlayerCard";
 import styles from "./RosterCard.module.css";
-
-const PROFILE_FALLBACK =
-  "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' fill='%232d2d3f'/><circle cx='12' cy='8' r='4' fill='%234a4a6a'/><path d='M5 20c0-4.2 3.5-7 7-7s7 2.8 7 7' fill='%234a4a6a'/></svg>";
 
 const SLOT_DISPLAY: Record<string, string> = {
   SUPER_FLEX: "SF",
@@ -83,9 +81,30 @@ export default function RosterCard({ roster, starterSlots, benchSlots, irSlots, 
 
   const filledStarters = localStarters.filter(Boolean).length;
 
+  const rarityCounts = useMemo(() =>
+    roster.players.reduce<Record<string, number>>((acc, p) => {
+      const key = p.rarity ?? "grey";
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {}),
+  [roster.players]);
+
   return (
     <div className={styles.rosterCard}>
       <h2>{roster.team_name || `Team ${roster.roster_id}`}</h2>
+
+      <div className={styles.rarityBar}>
+        {RARITY_ORDER.filter((r) => rarityCounts[r] > 0).map((r) => (
+          <div
+            key={r}
+            className={styles.raritySegment}
+            style={{ background: RARITY_COLORS[r], flex: rarityCounts[r] }}
+            title={`${r}: ${rarityCounts[r]}`}
+          >
+            {rarityCounts[r]}
+          </div>
+        ))}
+      </div>
 
       <div className={styles.section}>
         <h3 className={styles.sectionLabel}>Starters · {filledStarters}/{starterSlots.length}</h3>

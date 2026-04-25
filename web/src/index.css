@@ -1,8 +1,28 @@
 *, *::before, *::after { box-sizing: border-box; }
 
+:root {
+  --bg-page:     #080d08;
+  --bg-card:     #0f170f;
+  --bg-elevated: #141f14;
+  --bg-hover:    #1a2a1a;
+
+  --border:      #1e3020;
+  --border-ui:   #2d4a30;
+  --color-empty: #3a5c3a;
+
+  --accent:      #10b981;
+  --accent-hover:#34d399;
+
+  --text:        #e2ece2;
+  --text-muted:  #7a9e7a;
+  --text-dim:    #4a6e4a;
+
+  --color-error: #f87171;
+}
+
 body {
   margin: 0;
   font-family: system-ui, sans-serif;
-  background: #0f0f13;
-  color: #e2e8f0;
+  background: var(--bg-page);
+  color: var(--text);
 }

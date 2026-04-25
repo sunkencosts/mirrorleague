@@ -11,7 +11,7 @@
   height: 52px;
   border-radius: 50%;
   object-fit: cover;
-  background: #2d2d3f;
+  background: var(--border);
   flex-shrink: 0;
 }
 
@@ -28,24 +28,24 @@
 
 .playerMeta {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
-.selected {
-  box-shadow: inset 2px 0 0 #6366f1;
-}
+/* .selected {
+  box-shadow: inset 2px 0 0 var(--accent);
+} */
 
 .swapBtn {
   flex-shrink: 0;
   width: 2.75rem;
   background: none;
-  border: 1px solid #3d3d55;
+  border: 1px solid var(--border-ui);
   border-radius: 4px;
-  color: #64748b;
+  color: var(--text-dim);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.03em;
-  padding: 0.2rem 0;
+  padding: 0.3rem 0;
   cursor: pointer;
   line-height: 1;
   text-align: center;
@@ -55,8 +55,8 @@
 }
 
 .swapBtn:hover {
-  color: #a5b4fc;
-  border-color: #6366f1;
+  color: var(--accent-hover);
+  border-color: var(--accent);
 }
 
 .dropdown {
@@ -65,8 +65,8 @@
   left: 0;
   right: 0;
   z-index: 10;
-  background: #252535;
-  border: 1px solid #3d3d55;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-ui);
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   overflow: hidden;
@@ -80,8 +80,8 @@
   padding: 0.5rem 0.75rem;
   background: none;
   border: none;
-  border-bottom: 1px solid #2d2d3f;
-  color: #e2e8f0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
   cursor: pointer;
   text-align: left;
   transition: background 0.1s;
@@ -92,7 +92,7 @@
 }
 
 .dropdownItem:hover {
-  background: #2d2d45;
+  background: var(--bg-hover);
 }
 
 .dropdownItem img {
@@ -100,7 +100,7 @@
   height: 32px;
   border-radius: 50%;
   object-fit: cover;
-  background: #2d2d3f;
+  background: var(--border);
   flex-shrink: 0;
 }
 
@@ -112,7 +112,7 @@
 
 .dropdownMeta {
   font-size: 0.7rem;
-  color: #64748b;
+  color: var(--text-dim);
   flex-shrink: 0;
 }
 
@@ -120,9 +120,9 @@
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: #94a3b8;
-  background: #2d2d45;
-  border: 1px solid #3d3d55;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-ui);
   border-radius: 3px;
   padding: 0.1rem 0.35rem;
   flex-shrink: 0;
@@ -132,12 +132,12 @@
   margin: 0;
   padding: 0.75rem;
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-dim);
   font-style: italic;
 }
 
 .moveToEmpty {
-  color: #64748b;
-  border-top: 1px solid #3d3d55;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border-ui);
   font-style: italic;
 }

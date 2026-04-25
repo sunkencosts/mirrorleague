@@ -8,6 +8,7 @@ export interface Player {
   active: boolean;
   fantasy_positions: string[];
   image_url: string;
+  rarity?: import("./rarity").Rarity;
 }
 
 export interface SwapOption {

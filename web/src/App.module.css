@@ -14,7 +14,7 @@
 }
 
 .header p {
-  color: #94a3b8;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -28,9 +28,9 @@
   flex: 1;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid #334155;
-  background: #1e1e2e;
-  color: #e2e8f0;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
   font-size: 1rem;
 }
 
@@ -38,7 +38,7 @@
   padding: 0.5rem 1.25rem;
   border-radius: 6px;
   border: none;
-  background: #6366f1;
+  background: var(--accent);
   color: #fff;
   font-size: 1rem;
   cursor: pointer;
@@ -50,7 +50,7 @@
 }
 
 .error {
-  color: #f87171;
+  color: var(--color-error);
   margin-bottom: 1rem;
 }
 
