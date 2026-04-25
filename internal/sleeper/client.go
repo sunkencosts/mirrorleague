@@ -31,13 +31,19 @@ type Client struct {
 	baseURL     string
 	httpClient  *http.Client
 	playerCache *PlayerCache
+	rarity      rarityLookup
 }
 
-func New(baseURL string, cache *PlayerCache) *Client {
+type rarityLookup interface {
+	Get(fullName, pos string) (string, bool)
+}
+
+func New(baseURL string, cache *PlayerCache, rarity rarityLookup) *Client {
 	return &Client{
 		baseURL:     baseURL,
 		httpClient:  &http.Client{},
 		playerCache: cache,
+		rarity:      rarity,
 	}
 }
 
@@ -46,6 +52,11 @@ func (c *Client) resolvePlayers(ids []string) []provider.Player {
 	for _, id := range ids {
 		if player, ok := c.playerCache.Get(id); ok {
 			player.ImageURL = fmt.Sprintf("https://sleepercdn.com/content/nfl/players/thumb/%s.jpg", player.PlayerID)
+			if len(player.FantasyPositions) > 0 {
+				if rarity, ok := c.rarity.Get(player.FirstName+" "+player.LastName, player.FantasyPositions[0]); ok {
+					player.Rarity = rarity
+				}
+			}
 			players = append(players, player)
 		}
 	}

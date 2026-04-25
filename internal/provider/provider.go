@@ -163,6 +163,7 @@ type Player struct {
 	Active           bool     `json:"active"`
 	FantasyPositions []string `json:"fantasy_positions"`
 	ImageURL         string   `json:"image_url"`
+	Rarity           string   `json:"rarity"`
 }
 
 type Roster struct {

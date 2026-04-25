@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/sunkencosts/mirror-me/internal/provider"
+	"github.com/sunkencosts/mirror-me/internal/rankings"
 	"github.com/sunkencosts/mirror-me/internal/sleeper"
 	"github.com/sunkencosts/mirror-me/pkg/config"
 )
@@ -21,10 +22,11 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	defer cancel()
 
 	cfg := config.Load(getenv)
-	cache := &sleeper.PlayerCache{}
-	sleeperClient := sleeper.New(cfg.SleeperBaseURL, cache)
+	playerCache := &sleeper.PlayerCache{}
+	rankingsCache := &rankings.Cache{}
+	sleeperClient := sleeper.New(cfg.SleeperBaseURL, playerCache, rankingsCache)
 
-	srv := NewServer(sleeperClient, cache, cfg.SleeperBaseURL)
+	srv := NewServer(sleeperClient, playerCache, rankingsCache, cfg.SleeperBaseURL, cfg.RankingsCSVURL)
 
 	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
@@ -56,21 +58,25 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	return nil
 }
 
-func NewServer(sleeperClient provider.Provider, cache *sleeper.PlayerCache, baseURL string) http.Handler {
+func NewServer(sleeperClient provider.Provider, cache *sleeper.PlayerCache, rankingsCache *rankings.Cache, baseURL, rankingsURL string) http.Handler {
 	mux := http.NewServeMux()
 	addRoutes(mux, sleeperClient)
 
 	var (
-		once    sync.Once
-		initErr error
+		once                    sync.Once
+		playerErr, rankingsErr  error
 	)
 
 	core := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		once.Do(func() {
-			initErr = cache.Load(baseURL)
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() { defer wg.Done(); playerErr = cache.Load(baseURL) }()
+			go func() { defer wg.Done(); rankingsErr = rankingsCache.Load(rankingsURL) }()
+			wg.Wait()
 		})
-		if initErr != nil {
-			http.Error(w, "failed to load player data", http.StatusServiceUnavailable)
+		if playerErr != nil || rankingsErr != nil {
+			http.Error(w, "failed to load data", http.StatusServiceUnavailable)
 			return
 		}
 		mux.ServeHTTP(w, r)

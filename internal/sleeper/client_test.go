@@ -9,6 +9,10 @@ import (
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
 
+type noopRarity struct{}
+
+func (noopRarity) Get(_, _ string) (string, bool) { return "", false }
+
 func TestGetRosters_teamName(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/league/abc/rosters", func(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +29,7 @@ func TestGetRosters_teamName(t *testing.T) {
 	defer srv.Close()
 
 	cache := &PlayerCache{Players: map[string]provider.Player{"111": {PlayerID: "111"}}}
-	c := New(srv.URL, cache)
+	c := New(srv.URL, cache, noopRarity{})
 
 	rosters, err := c.GetRosters("abc")
 	if err != nil {
@@ -46,7 +50,7 @@ func TestResolvePlayers(t *testing.T) {
 			"222": {PlayerID: "222", FirstName: "Travis", LastName: "Kelce"},
 		},
 	}
-	c := &Client{playerCache: cache}
+	c := &Client{playerCache: cache, rarity: noopRarity{}}
 
 	got := c.resolvePlayers([]string{"111", "222", "999"})
 
