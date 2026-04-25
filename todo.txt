@@ -1,1 +1,2 @@
-fix the roster spots on defence
+put rankings like fortnite gun rarity
+https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_fpecr_latest.csv      
