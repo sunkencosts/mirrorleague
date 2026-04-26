@@ -1,2 +1,17 @@
-put rankings like fortnite gun rarity
-https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_fpecr_latest.csv      
+- vert scroll cause shift when load is clicked.
+- search for a player
+- Need to see scores by week? Week selector?
+- Need to see my vs their lineup. Official vs better.
+
+
+Database
+- if a user wants to submit a "better" lineup
+- if a user wants to edit their submitted lineup
+- User can see previously viewed leagueIds and set a nickname if they want.
+
+
+
+Entire point is to submit a better lineup and see if you beat the owner.
+- Testing should be easy. Just use 2025 data and simulate.
+- Incentive for teams who suck like Kevin, it's an incentive to stay involved in the league. Maybe the league says that they get a perk for setting the best lineup?
+- How can I claim a team and ask "who should I start" questions? Or is that implicit by allowing people to set any lineup.

@@ -21,7 +21,7 @@ tmux send-keys -t $SESSION:3 "cd $ROOT/web && npm run dev" Enter
 
 # 4: Go server
 tmux new-window -t $SESSION:4 -n "server"
-tmux send-keys -t $SESSION:4 "cd $ROOT && air" Enter
+tmux send-keys -t $SESSION:4 "cd $ROOT/api && air" Enter
 
 tmux select-window -t $SESSION:1
 tmux attach -t $SESSION
