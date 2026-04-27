@@ -1,5 +1,6 @@
 api/tmp/
 api/server
+api/.env
 players.json
 rankings.json
 tmp/

@@ -27,11 +27,19 @@ func (s *Store) UpsertPlayers(ctx context.Context, players []provider.Player) er
 		if player.FantasyPositions == nil {
 			player.FantasyPositions = []string{}
 		}
-		batch.Queue(`INSERT INTO players (player_id, first_name, last_name, team, active, fantasy_positions, number, age, rarity, updated_at) 
+		batch.Queue(`INSERT INTO players (player_id, first_name, last_name, team, active, fantasy_positions, number, age, rarity, updated_at)
 					VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
-					ON CONFLICT (player_id) 
+					ON CONFLICT (player_id)
 					DO UPDATE SET first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, team=EXCLUDED.team, active=EXCLUDED.active,
-      				fantasy_positions=EXCLUDED.fantasy_positions, number=EXCLUDED.number, age=EXCLUDED.age, rarity=EXCLUDED.rarity, updated_at=now() `,
+      				fantasy_positions=EXCLUDED.fantasy_positions, number=EXCLUDED.number, age=EXCLUDED.age, rarity=EXCLUDED.rarity, updated_at=now()
+					WHERE players.first_name IS DISTINCT FROM EXCLUDED.first_name
+					   OR players.last_name IS DISTINCT FROM EXCLUDED.last_name
+					   OR players.team IS DISTINCT FROM EXCLUDED.team
+					   OR players.active IS DISTINCT FROM EXCLUDED.active
+					   OR players.fantasy_positions IS DISTINCT FROM EXCLUDED.fantasy_positions
+					   OR players.number IS DISTINCT FROM EXCLUDED.number
+					   OR players.age IS DISTINCT FROM EXCLUDED.age
+					   OR players.rarity IS DISTINCT FROM EXCLUDED.rarity`,
 			player.PlayerID, player.FirstName, player.LastName, player.Team, player.Active, player.FantasyPositions, player.Number, player.Age, player.Rarity)
 	}
 	results := s.pool.SendBatch(ctx, batch)

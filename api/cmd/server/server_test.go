@@ -5,38 +5,66 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sunkencosts/mirror-me/internal/db"
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
 
-func newTestServer(t *testing.T, sleeperHandler http.Handler) string {
+const testDatabaseURL = "postgres://mirrorme:mirrorme@localhost:5433/mirrorme_test"
+
+// testPlayers is the fixed reference dataset seeded once before all tests run.
+// Use these player IDs in any Sleeper mock that needs player resolution.
+var testPlayers = []provider.Player{
+	{PlayerID: "111", FirstName: "Josh", LastName: "Allen", FantasyPositions: []string{"QB"}},
+	{PlayerID: "222", FirstName: "Justin", LastName: "Jefferson", FantasyPositions: []string{"WR"}},
+	{PlayerID: "333", FirstName: "Christian", LastName: "McCaffrey", FantasyPositions: []string{"RB"}},
+	{PlayerID: "444", FirstName: "Travis", LastName: "Kelce", FantasyPositions: []string{"TE"}},
+	{PlayerID: "555", FirstName: "Tyreek", LastName: "Hill", FantasyPositions: []string{"WR"}},
+}
+
+func TestMain(m *testing.M) {
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, testDatabaseURL)
+	if err != nil {
+		log.Fatalf("TestMain: connect test db: %v", err)
+	}
+	if err := db.NewStore(pool).UpsertPlayers(ctx, testPlayers); err != nil {
+		log.Fatalf("TestMain: seed players: %v", err)
+	}
+	code := m.Run()
+	pool.Close()
+	os.Exit(code)
+}
+
+func newTestServer(t *testing.T, sleeperHandler http.Handler, extraEnv ...map[string]string) string {
 	t.Helper()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/players/nfl", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]provider.Player{
-			"111": {PlayerID: "111", FirstName: "Josh", LastName: "Allen"},
-		})
-	})
-	mux.Handle("/", sleeperHandler)
-	fakeSleeper := httptest.NewServer(mux)
+	fakeSleeper := httptest.NewServer(sleeperHandler)
 	t.Cleanup(fakeSleeper.Close)
 
 	port := freePort(t)
 	getenv := func(key string) string {
+		for _, env := range extraEnv {
+			if v, ok := env[key]; ok {
+				return v
+			}
+		}
 		switch key {
 		case "PORT":
 			return port
 		case "SLEEPER_BASE_URL":
 			return fakeSleeper.URL
 		case "DATABASE_URL":
-			return "postgres://mirrorme:mirrorme@localhost:5433/mirrorme"
+			return testDatabaseURL
 		case "MIGRATIONS_URL":
 			return "file://../../migrations"
 		}
@@ -74,14 +102,12 @@ func waitForReady(ctx context.Context, timeout time.Duration, endpoint string) e
 			return fmt.Errorf("failed to create request: %w", err)
 		}
 		resp, err := client.Do(req)
-		if err != nil {
-			continue
-		}
-		if resp.StatusCode == http.StatusOK {
+		if err == nil {
 			resp.Body.Close()
-			return nil
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
 		}
-		resp.Body.Close()
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -169,5 +195,42 @@ func TestHealthz(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestSyncPlayers(t *testing.T) {
+	// Fake rankings CSV: 23 columns, two players with known rarities.
+	// Column indices: 1=page_type, 5=pos, 22=merge_name.
+	fakeRankings := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "c0,page_type,c2,c3,c4,pos,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17,c18,c19,c20,c21,merge_name\n")
+		fmt.Fprint(w, "x,dynasty-qb,x,x,x,QB,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,Josh Allen\n")
+		fmt.Fprint(w, "x,dynasty-rb,x,x,x,RB,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,Christian McCaffrey\n")
+	}))
+	t.Cleanup(fakeRankings.Close)
+
+	baseURL := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/players/nfl" {
+			json.NewEncoder(w).Encode(map[string]provider.Player{
+				"111": {PlayerID: "111", FirstName: "Josh", LastName: "Allen", FantasyPositions: []string{"QB"}},
+				"333": {PlayerID: "333", FirstName: "Christian", LastName: "McCaffrey", FantasyPositions: []string{"RB"}},
+			})
+		}
+	}), map[string]string{"RANKINGS_CSV_URL": fakeRankings.URL})
+
+	resp, err := http.Post(baseURL+"/api/admin/sync-players", "", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var result map[string]int
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result["upserted"] != 2 {
+		t.Errorf("expected 2 upserted, got %d", result["upserted"])
 	}
 }
