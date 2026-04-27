@@ -37,6 +37,8 @@ func newTestServer(t *testing.T, sleeperHandler http.Handler) string {
 			return fakeSleeper.URL
 		case "DATABASE_URL":
 			return "postgres://mirrorme:mirrorme@localhost:5433/mirrorme"
+		case "MIGRATIONS_URL":
+			return "file://../../migrations"
 		}
 		return ""
 	}

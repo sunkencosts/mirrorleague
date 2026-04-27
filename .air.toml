@@ -1,3 +1,0 @@
-[build]
-  cmd = "cd api && go build -o tmp/server ./cmd/server"
-  bin = "./api/tmp/server"

@@ -9,13 +9,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sunkencosts/mirror-me/internal/db"
 	"github.com/sunkencosts/mirror-me/internal/provider"
-	"github.com/sunkencosts/mirror-me/internal/rankings"
 	"github.com/sunkencosts/mirror-me/internal/sleeper"
 	"github.com/sunkencosts/mirror-me/pkg/config"
 )
@@ -25,9 +28,6 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	defer cancel()
 
 	cfg := config.Load(getenv)
-	playerCache := &sleeper.PlayerCache{}
-	rankingsCache := &rankings.Cache{}
-	sleeperClient := sleeper.New(cfg.SleeperBaseURL, playerCache, rankingsCache)
 
 	dbpool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -40,8 +40,18 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 		return fmt.Errorf("pinging database: %w", err)
 	}
 	log.Println("database connected")
+	sleeperClient := sleeper.New(cfg.SleeperBaseURL, store)
 
-	srv := NewServer(sleeperClient, playerCache, rankingsCache, cfg, store)
+	migrateURL := strings.Replace(cfg.DatabaseURL, "postgresql://", "pgx5://", 1)
+	migrateURL = strings.Replace(migrateURL, "postgres://", "pgx5://", 1)
+	m, err := migrate.New(cfg.MigrationsURL, migrateURL)
+	if err != nil {
+		return fmt.Errorf("creating migrator: %w", err)
+	}
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("running migrations: %w", err)
+	}
+	srv := NewServer(sleeperClient, cfg, store)
 
 	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
@@ -73,31 +83,11 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	return nil
 }
 
-func NewServer(sleeperClient provider.Provider, cache *sleeper.PlayerCache, rankingsCache *rankings.Cache, cfg config.Config, store *db.Store) http.Handler {
+func NewServer(sleeperClient provider.Provider, cfg config.Config, store *db.Store) http.Handler {
 	mux := http.NewServeMux()
-	addRoutes(mux, sleeperClient, store)
+	addRoutes(mux, sleeperClient, store, cfg)
 
-	var (
-		once                   sync.Once
-		playerErr, rankingsErr error
-	)
-
-	core := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		once.Do(func() {
-			var wg sync.WaitGroup
-			wg.Add(2)
-			go func() { defer wg.Done(); playerErr = cache.Load(cfg.SleeperBaseURL) }()
-			go func() { defer wg.Done(); rankingsErr = rankingsCache.Load(cfg.RankingsCSVURL) }()
-			wg.Wait()
-		})
-		if playerErr != nil || rankingsErr != nil {
-			http.Error(w, "failed to load data", http.StatusServiceUnavailable)
-			return
-		}
-		mux.ServeHTTP(w, r)
-	})
-
-	var handler http.Handler = core
+	var handler http.Handler = mux
 	handler = corsMiddleware(handler)
 	return handler
 }

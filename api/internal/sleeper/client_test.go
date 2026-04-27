@@ -1,6 +1,7 @@
 package sleeper
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,9 +10,19 @@ import (
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
 
-type noopRarity struct{}
+type mapPlayerLookup struct {
+	players map[string]provider.Player
+}
 
-func (noopRarity) Get(_, _ string) (string, bool) { return "", false }
+func (m *mapPlayerLookup) GetPlayersByIDs(_ context.Context, ids []string) (map[string]provider.Player, error) {
+	result := map[string]provider.Player{}
+	for _, id := range ids {
+		if p, ok := m.players[id]; ok {
+			result[id] = p
+		}
+	}
+	return result, nil
+}
 
 func TestGetRosters_teamName(t *testing.T) {
 	mux := http.NewServeMux()
@@ -28,10 +39,10 @@ func TestGetRosters_teamName(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	cache := &PlayerCache{Players: map[string]provider.Player{"111": {PlayerID: "111"}}}
-	c := New(srv.URL, cache, noopRarity{})
+	lookup := &mapPlayerLookup{players: map[string]provider.Player{"111": {PlayerID: "111"}}}
+	c := New(srv.URL, lookup)
 
-	rosters, err := c.GetRosters("abc")
+	rosters, err := c.GetRosters(context.Background(), "abc")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -44,15 +55,13 @@ func TestGetRosters_teamName(t *testing.T) {
 }
 
 func TestResolvePlayers(t *testing.T) {
-	cache := &PlayerCache{
-		Players: map[string]provider.Player{
-			"111": {PlayerID: "111", FirstName: "Patrick", LastName: "Mahomes"},
-			"222": {PlayerID: "222", FirstName: "Travis", LastName: "Kelce"},
-		},
+	playerMap := map[string]provider.Player{
+		"111": {PlayerID: "111", FirstName: "Patrick", LastName: "Mahomes"},
+		"222": {PlayerID: "222", FirstName: "Travis", LastName: "Kelce"},
 	}
-	c := &Client{playerCache: cache, rarity: noopRarity{}}
+	c := &Client{players: &mapPlayerLookup{players: playerMap}}
 
-	got := c.resolvePlayers([]string{"111", "222", "999"})
+	got := c.resolvePlayers(playerMap, []string{"111", "222", "999"})
 
 	if len(got) != 2 {
 		t.Fatalf("expected 2 players, got %d", len(got))

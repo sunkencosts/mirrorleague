@@ -1,5 +1,7 @@
 package provider
 
+import "context"
+
 type User struct {
 	UserID      string `json:"user_id"`
 	Username    string `json:"username"`
@@ -176,6 +178,6 @@ type Roster struct {
 	Taxi     []Player `json:"taxi"`
 }
 type Provider interface {
-	GetRosters(leagueID string) ([]Roster, error)
-	GetLeague(leagueID string) (League, error)
+	GetRosters(ctx context.Context, leagueID string) ([]Roster, error)
+	GetLeague(ctx context.Context, leagueID string) (League, error)
 }

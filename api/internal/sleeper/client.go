@@ -1,6 +1,7 @@
 package sleeper
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -28,44 +29,41 @@ type leagueUser struct {
 }
 
 type Client struct {
-	baseURL     string
-	httpClient  *http.Client
-	playerCache *PlayerCache
-	rarity      rarityLookup
+	baseURL    string
+	httpClient *http.Client
+	players    playerLookup
 }
 
-type rarityLookup interface {
-	Get(fullName, pos string) (string, bool)
+type playerLookup interface {
+	GetPlayersByIDs(ctx context.Context, ids []string) (map[string]provider.Player, error)
 }
 
-func New(baseURL string, cache *PlayerCache, rarity rarityLookup) *Client {
+func New(baseURL string, players playerLookup) *Client {
 	return &Client{
-		baseURL:     baseURL,
-		httpClient:  &http.Client{},
-		playerCache: cache,
-		rarity:      rarity,
+		baseURL:    baseURL,
+		httpClient: &http.Client{},
+		players:    players,
 	}
 }
 
-func (c *Client) resolvePlayers(ids []string) []provider.Player {
+func (c *Client) resolvePlayers(playerMap map[string]provider.Player, ids []string) []provider.Player {
 	players := []provider.Player{}
 	for _, id := range ids {
-		if player, ok := c.playerCache.Get(id); ok {
+		if player, ok := playerMap[id]; ok {
 			player.ImageURL = fmt.Sprintf("https://sleepercdn.com/content/nfl/players/thumb/%s.jpg", player.PlayerID)
-			if len(player.FantasyPositions) > 0 {
-				if rarity, ok := c.rarity.Get(player.FirstName+" "+player.LastName, player.FantasyPositions[0]); ok {
-					player.Rarity = rarity
-				}
-			}
 			players = append(players, player)
 		}
 	}
 	return players
 }
 
-func (c *Client) getLeagueUsers(leagueID string) (map[string]leagueUser, error) {
+func (c *Client) getLeagueUsers(ctx context.Context, leagueID string) (map[string]leagueUser, error) {
 	url := c.baseURL + "/league/" + leagueID + "/users"
-	resp, err := c.httpClient.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating users request: %w", err)
+	}
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("getting users for league %s: %w", leagueID, err)
 	}
@@ -82,22 +80,26 @@ func (c *Client) getLeagueUsers(leagueID string) (map[string]leagueUser, error) 
 	}
 	return byID, nil
 }
-func (c *Client) GetLeague(leagueID string) (provider.League, error) {
+func (c *Client) GetLeague(ctx context.Context, leagueID string) (provider.League, error) {
 	url := c.baseURL + "/league/" + leagueID
 	var leagueSettings provider.League
 
-	resp, err := c.httpClient.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return provider.League{}, fmt.Errorf("getting league for leagueID %s", leagueID)
+		return provider.League{}, fmt.Errorf("creating league request: %w", err)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return provider.League{}, fmt.Errorf("getting league for leagueID %s: %w", leagueID, err)
 	}
 	defer resp.Body.Close()
 	if err := json.NewDecoder(resp.Body).Decode(&leagueSettings); err != nil {
-		return provider.League{}, fmt.Errorf("getting decoding league: %w", err)
+		return provider.League{}, fmt.Errorf("decoding league: %w", err)
 	}
 	return leagueSettings, nil
 }
 
-func (c *Client) GetRosters(leagueID string) ([]provider.Roster, error) {
+func (c *Client) GetRosters(ctx context.Context, leagueID string) ([]provider.Roster, error) {
 	var wg sync.WaitGroup
 	var rawRosters []roster
 	var usersByID map[string]leagueUser
@@ -107,7 +109,12 @@ func (c *Client) GetRosters(leagueID string) ([]provider.Roster, error) {
 	go func() {
 		defer wg.Done()
 		url := c.baseURL + "/league/" + leagueID + "/rosters"
-		resp, err := c.httpClient.Get(url)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			rosterErr = fmt.Errorf("creating rosters request: %w", err)
+			return
+		}
+		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			rosterErr = fmt.Errorf("getting rosters for league %s: %w", leagueID, err)
 			return
@@ -119,7 +126,7 @@ func (c *Client) GetRosters(leagueID string) ([]provider.Roster, error) {
 	}()
 	go func() {
 		defer wg.Done()
-		usersByID, userErr = c.getLeagueUsers(leagueID)
+		usersByID, userErr = c.getLeagueUsers(ctx, leagueID)
 	}()
 	wg.Wait()
 
@@ -128,6 +135,23 @@ func (c *Client) GetRosters(leagueID string) ([]provider.Roster, error) {
 	}
 	if userErr != nil {
 		return nil, userErr
+	}
+	seen := map[string]bool{}
+	var allIDs []string
+	for _, r := range rawRosters {
+		for _, ids := range [][]string{r.Players, r.Starters, r.Reserve, r.Taxi} {
+			for _, id := range ids {
+				if !seen[id] {
+					seen[id] = true
+					allIDs = append(allIDs, id)
+				}
+			}
+		}
+	}
+
+	playerMap, err := c.players.GetPlayersByIDs(ctx, allIDs)
+	if err != nil {
+		return nil, fmt.Errorf("fetching players: %w", err)
 	}
 
 	var result []provider.Roster
@@ -140,10 +164,10 @@ func (c *Client) GetRosters(leagueID string) ([]provider.Roster, error) {
 			RosterID: r.RosterID,
 			OwnerID:  r.OwnerID,
 			TeamName: teamName,
-			Players:  c.resolvePlayers(r.Players),
-			Starters: c.resolvePlayers(r.Starters),
-			Reserve:  c.resolvePlayers(r.Reserve),
-			Taxi:     c.resolvePlayers(r.Taxi),
+			Players:  c.resolvePlayers(playerMap, r.Players),
+			Starters: c.resolvePlayers(playerMap, r.Starters),
+			Reserve:  c.resolvePlayers(playerMap, r.Reserve),
+			Taxi:     c.resolvePlayers(playerMap, r.Taxi),
 		})
 	}
 

@@ -1,19 +1,20 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
 
 type leagueProvider interface {
-	GetLeague(leagueID string) (provider.League, error)
+	GetLeague(ctx context.Context, leagueID string) (provider.League, error)
 }
 
 func HandleGetLeague(p leagueProvider) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		leagueID := r.PathValue("leagueId")
-		league, err := p.GetLeague(leagueID)
+		league, err := p.GetLeague(r.Context(), leagueID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

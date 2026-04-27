@@ -10,11 +10,13 @@ import (
 	"github.com/sunkencosts/mirror-me/internal/db"
 	"github.com/sunkencosts/mirror-me/internal/handlers"
 	"github.com/sunkencosts/mirror-me/internal/provider"
+	"github.com/sunkencosts/mirror-me/pkg/config"
 )
 
-func addRoutes(mux *http.ServeMux, sleeperClient provider.Provider, store *db.Store) {
+func addRoutes(mux *http.ServeMux, sleeperClient provider.Provider, store *db.Store, cfg config.Config) {
 	mux.Handle("GET /api/league/{leagueId}/rosters", handlers.HandleGetRosters(sleeperClient))
 	mux.Handle("GET /api/league/{leagueId}", handlers.HandleGetLeague(sleeperClient))
+	mux.Handle("POST /api/admin/sync-players", handlers.HandleSyncPlayers(store, cfg.SleeperBaseURL, cfg.RankingsCSVURL))
 	mux.HandleFunc("GET /healthz", handleHealthz(store))
 	mux.Handle("/", spaHandler("web/dist"))
 }
