@@ -2,6 +2,7 @@
 - search for a player
 - Need to see scores by week? Week selector?
 - Need to see my vs their lineup. Official vs better.
+- figure out a better way to rank teams
 
 
 Database

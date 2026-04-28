@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import type { Roster, Player, SwapOption } from "../types";
-import { RARITY_ORDER, RARITY_COLORS } from "../rarity";
 import PlayerCard, { PROFILE_FALLBACK } from "./PlayerCard";
+import RosterRarity from "./RosterRarity";
 import styles from "./RosterCard.module.css";
 
 const SLOT_DISPLAY: Record<string, string> = {
@@ -39,9 +39,10 @@ interface Props {
   benchSlots: number;
   irSlots: number;
   taxiSlots: number;
+  allScores: number[];
 }
 
-export default function RosterCard({ roster, starterSlots, benchSlots, irSlots, taxiSlots }: Props) {
+export default function RosterCard({ roster, starterSlots, benchSlots, irSlots, taxiSlots, allScores }: Props) {
   const [localStarters, setLocalStarters] = useState<(Player | null)[]>(
     () => Array.from({ length: starterSlots.length }, (_, i) => roster.starters[i] ?? null),
   );
@@ -81,30 +82,15 @@ export default function RosterCard({ roster, starterSlots, benchSlots, irSlots, 
 
   const filledStarters = localStarters.filter(Boolean).length;
 
-  const rarityCounts = useMemo(() =>
-    roster.players.reduce<Record<string, number>>((acc, p) => {
-      const key = p.rarity ?? "grey";
-      acc[key] = (acc[key] ?? 0) + 1;
-      return acc;
-    }, {}),
-  [roster.players]);
-
   return (
     <div className={styles.rosterCard}>
       <h2>{roster.team_name || `Team ${roster.roster_id}`}</h2>
 
-      <div className={styles.rarityBar}>
-        {RARITY_ORDER.filter((r) => rarityCounts[r] > 0).map((r) => (
-          <div
-            key={r}
-            className={styles.raritySegment}
-            style={{ background: RARITY_COLORS[r], flex: rarityCounts[r] }}
-            title={`${r}: ${rarityCounts[r]}`}
-          >
-            {rarityCounts[r]}
-          </div>
-        ))}
-      </div>
+      <RosterRarity
+        players={roster.players}
+        starters={localStarters.filter((p): p is Player => p !== null)}
+        allScores={allScores}
+      />
 
       <div className={styles.section}>
         <h3 className={styles.sectionLabel}>Starters · {filledStarters}/{starterSlots.length}</h3>

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { Roster, League } from "./types";
 import RosterCard from "./components/RosterCard";
+import { computePowerScore } from "./scoring";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -28,8 +29,10 @@ export default function App() {
         fetch(`/api/league/${leagueId}`),
         fetch(`/api/league/${leagueId}/rosters`),
       ]);
-      if (!leagueRes.ok) throw new Error(`${leagueRes.status} ${leagueRes.statusText}`);
-      if (!rostersRes.ok) throw new Error(`${rostersRes.status} ${rostersRes.statusText}`);
+      if (!leagueRes.ok)
+        throw new Error(`${leagueRes.status} ${leagueRes.statusText}`);
+      if (!rostersRes.ok)
+        throw new Error(`${rostersRes.status} ${rostersRes.statusText}`);
       const league: League = await leagueRes.json();
       const data: Roster[] = await rostersRes.json();
       setStarterSlots(league.roster_positions.filter((p) => p !== "BN"));
@@ -44,11 +47,17 @@ export default function App() {
     }
   }
 
+  const allScores = useMemo(
+    () => rosters.map((r) => computePowerScore(r.players, r.starters)),
+    [rosters],
+  );
+
   return (
     <div className={styles.app}>
       <header className={styles.header}>
         <h1>Mirror Me</h1>
         <p>Mirror a Sleeper league and set your own lineup</p>
+        <p>1182073403987832832</p>
       </header>
 
       <form onSubmit={fetchRosters} className={styles.leagueForm}>
@@ -68,7 +77,15 @@ export default function App() {
 
       <div className={styles.rosterGrid}>
         {rosters.map((roster) => (
-          <RosterCard key={roster.roster_id} roster={roster} starterSlots={starterSlots} benchSlots={benchSlots} irSlots={irSlots} taxiSlots={taxiSlots} />
+          <RosterCard
+            key={roster.roster_id}
+            roster={roster}
+            starterSlots={starterSlots}
+            benchSlots={benchSlots}
+            irSlots={irSlots}
+            taxiSlots={taxiSlots}
+            allScores={allScores}
+          />
         ))}
       </div>
     </div>
