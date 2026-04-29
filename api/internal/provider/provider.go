@@ -1,6 +1,9 @@
 package provider
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type User struct {
 	UserID      string `json:"user_id"`
@@ -176,6 +179,16 @@ type Roster struct {
 	Starters []Player `json:"starters"`
 	Reserve  []Player `json:"reserve"`
 	Taxi     []Player `json:"taxi"`
+}
+type Lineup struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	LeagueID  string    `json:"league_id"`
+	RosterID  int       `json:"roster_id"`
+	Week      int       `json:"week"`
+	Starters  []string  `json:"starters"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 type Provider interface {
 	GetRosters(ctx context.Context, leagueID string) ([]Roster, error)

@@ -6,6 +6,14 @@ import (
 	"net/http"
 )
 
+func decode[T any](r *http.Request) (T, error) {
+	var v T
+	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+		return v, err
+	}
+	return v, nil
+}
+
 func encode[T any](w http.ResponseWriter, r *http.Request, status int, v T) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

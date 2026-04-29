@@ -1,11 +1,11 @@
+# FE
 - vert scroll cause shift when load is clicked.
 - search for a player
 - Need to see scores by week? Week selector?
 - Need to see my vs their lineup. Official vs better.
 - figure out a better way to rank teams
 
-
-Database
+# Database
 - if a user wants to submit a "better" lineup
 - if a user wants to edit their submitted lineup
 - User can see previously viewed leagueIds and set a nickname if they want.

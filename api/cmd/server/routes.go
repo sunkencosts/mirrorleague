@@ -14,6 +14,9 @@ import (
 )
 
 func addRoutes(mux *http.ServeMux, sleeperClient provider.Provider, store *db.Store, cfg config.Config) {
+	mux.Handle("POST /api/lineups", handlers.HandleCreateLineup(store, sleeperClient))
+	mux.Handle("PATCH /api/lineups/{id}", handlers.HandleUpdateLineup(store, sleeperClient))
+	mux.Handle("GET /api/lineups/{id}", handlers.HandleGetLineup(store))
 	mux.Handle("GET /api/league/{leagueId}/rosters", handlers.HandleGetRosters(sleeperClient))
 	mux.Handle("GET /api/league/{leagueId}", handlers.HandleGetLeague(sleeperClient))
 	mux.Handle("POST /api/admin/sync-players", handlers.HandleSyncPlayers(store, cfg.SleeperBaseURL, cfg.RankingsCSVURL))

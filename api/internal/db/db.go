@@ -73,5 +73,47 @@ func (s *Store) GetPlayersByIDs(ctx context.Context, ids []string) (map[string]p
 		return nil, fmt.Errorf("iterating players: %w", err)
 	}
 	return result, nil
+}
 
+func (s *Store) CreateLineup(ctx context.Context, userID, leagueID string, rosterID, week int, starters []string) (provider.Lineup, error) {
+
+	var l provider.Lineup
+	err := s.pool.QueryRow(ctx, `
+					INSERT INTO lineups (user_id, league_id, roster_id, week, starters)
+					VALUES ($1, $2, $3, $4, $5)
+					RETURNING id, user_id, league_id, roster_id, week, starters, created_at, updated_at
+					`, userID, leagueID, rosterID, week, starters).Scan(
+		&l.ID, &l.UserID, &l.LeagueID, &l.RosterID, &l.Week, &l.Starters, &l.CreatedAt, &l.UpdatedAt)
+	if err != nil {
+		return provider.Lineup{}, fmt.Errorf("creating lineup: %w", err)
+	}
+	return l, nil
+}
+func (s *Store) GetLineup(ctx context.Context, id string) (provider.Lineup, error) {
+	var l provider.Lineup
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, user_id, league_id, roster_id, week, starters, created_at, updated_at
+		FROM lineups WHERE id = $1
+	`, id).Scan(
+		&l.ID, &l.UserID, &l.LeagueID, &l.RosterID, &l.Week, &l.Starters, &l.CreatedAt, &l.UpdatedAt,
+	)
+	if err != nil {
+		return provider.Lineup{}, fmt.Errorf("getting lineup %s: %w", id, err)
+	}
+	return l, nil
+}
+
+func (s *Store) UpdateLineup(ctx context.Context, id string, starters []string) (provider.Lineup, error) {
+	var l provider.Lineup
+	err := s.pool.QueryRow(ctx, `
+				UPDATE lineups 
+				SET starters = $2, updated_at = now()
+				WHERE id = $1
+				RETURNING id, user_id, league_id, roster_id, week, starters, created_at, updated_at
+							`,
+		id, starters).Scan(&l.ID, &l.UserID, &l.LeagueID, &l.RosterID, &l.Week, &l.Starters, &l.CreatedAt, &l.UpdatedAt)
+	if err != nil {
+		return provider.Lineup{}, fmt.Errorf("updating lineup %s: %w", id, err)
+	}
+	return l, nil
 }

@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -232,5 +233,186 @@ func TestSyncPlayers(t *testing.T) {
 	}
 	if result["upserted"] != 2 {
 		t.Errorf("expected 2 upserted, got %d", result["upserted"])
+	}
+}
+
+func lineupSleeperHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/league/test-league/rosters":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"roster_id": 1, "owner_id": "owner1", "players": []string{"111", "222", "333"}, "starters": []string{"111"}},
+			})
+		case "/league/test-league/users":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"user_id": "owner1", "metadata": map[string]string{"team_name": "Test Team"}},
+			})
+		}
+	})
+}
+
+func createTestLineup(t *testing.T, baseURL string) provider.Lineup {
+	t.Helper()
+	body := `{"user_id":"user-abc","league_id":"test-league","roster_id":1,"week":1,"starters":["111","222"]}`
+	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("createTestLineup: request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("createTestLineup: expected 201, got %d", resp.StatusCode)
+	}
+	var lineup provider.Lineup
+	if err := json.NewDecoder(resp.Body).Decode(&lineup); err != nil {
+		t.Fatalf("createTestLineup: failed to decode: %v", err)
+	}
+	return lineup
+}
+
+func TestCreateLineup(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+
+	body := `{"user_id":"user-abc","league_id":"test-league","roster_id":1,"week":1,"starters":["111","222"]}`
+	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.StatusCode)
+	}
+	var lineup provider.Lineup
+	if err := json.NewDecoder(resp.Body).Decode(&lineup); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+
+	if lineup.ID == "" {
+		t.Error("expected a non-empty lineup ID")
+	}
+	if loc := resp.Header.Get("Location"); loc != "/api/lineups/"+lineup.ID {
+		t.Errorf("expected Location header %q, got %q", "/api/lineups/"+lineup.ID, loc)
+	}
+	if lineup.UserID != "user-abc" {
+		t.Errorf("expected user_id %q, got %q", "user-abc", lineup.UserID)
+	}
+	if lineup.LeagueID != "test-league" {
+		t.Errorf("expected league_id %q, got %q", "test-league", lineup.LeagueID)
+	}
+	if lineup.RosterID != 1 {
+		t.Errorf("expected roster_id 1, got %d", lineup.RosterID)
+	}
+	if lineup.Week != 1 {
+		t.Errorf("expected week 1, got %d", lineup.Week)
+	}
+	if len(lineup.Starters) != 2 || lineup.Starters[0] != "111" || lineup.Starters[1] != "222" {
+		t.Errorf("unexpected starters: %v", lineup.Starters)
+	}
+}
+func TestCreateLineup_InvalidPlayer(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+
+	body := `{"user_id":"user-abc","league_id":"test-league","roster_id":1,"week":1,"starters":["999"]}`
+	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+func TestGetLineup(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+	created := createTestLineup(t, baseURL)
+
+	resp, err := http.Get(baseURL + "/api/lineups/" + created.ID)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var lineup provider.Lineup
+	if err := json.NewDecoder(resp.Body).Decode(&lineup); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if lineup.ID != created.ID {
+		t.Errorf("expected id %q, got %q", created.ID, lineup.ID)
+	}
+}
+
+func TestGetLineup_NotFound(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+
+	resp, err := http.Get(baseURL + "/api/lineups/00000000-0000-0000-0000-000000000000")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+func TestUpdateLineup(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+	created := createTestLineup(t, baseURL)
+
+	body := `{"user_id":"user-abc","starters":["111","333"]}`
+	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/lineups/"+created.ID, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var lineup provider.Lineup
+	if err := json.NewDecoder(resp.Body).Decode(&lineup); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if len(lineup.Starters) != 2 || lineup.Starters[0] != "111" || lineup.Starters[1] != "333" {
+		t.Errorf("unexpected starters: %v", lineup.Starters)
+	}
+}
+
+func TestUpdateLineup_WrongUser(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+	created := createTestLineup(t, baseURL)
+
+	body := `{"user_id":"someone-else","starters":["111"]}`
+	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/lineups/"+created.ID, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", resp.StatusCode)
+	}
+}
+
+func TestUpdateLineup_NotFound(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+
+	body := `{"user_id":"user-abc","starters":["111"]}`
+	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/lineups/00000000-0000-0000-0000-000000000000", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
 	}
 }
