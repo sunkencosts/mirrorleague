@@ -1,2 +1,4 @@
 DROP TABLE IF EXISTS lineups;
 
+DROP TABLE IF EXISTS players;
+

@@ -33,3 +33,9 @@ export interface League {
     taxi_slots: number;
   };
 }
+
+export interface Lineup {
+  id: string;
+  roster_id: number;
+  starters: string[];
+}

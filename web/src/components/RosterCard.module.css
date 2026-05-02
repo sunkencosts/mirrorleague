@@ -5,8 +5,16 @@
   border: 1px solid var(--border);
 }
 
-.rosterCard h2 {
-  margin: 0 0 1.25rem;
+.cardHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.cardHeader h2 {
+  margin: 0;
   font-size: 1rem;
   font-weight: 600;
 }
@@ -48,6 +56,10 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.25rem 0;
+}
+
+.emptyStarterRow.reversed {
+  flex-direction: row-reverse;
 }
 
 .emptyAvatar {
@@ -149,4 +161,79 @@
   font-size: 0.8rem;
   color: var(--text-dim);
   font-style: italic;
+}
+
+.starterGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.starterRow {
+  display: grid;
+  grid-template-columns: 1fr 2.5rem 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.slotBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-ui);
+  border-radius: 4px;
+  height: 1.4rem;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.slotBadge:hover {
+  color: var(--accent-hover);
+  border-color: var(--accent);
+}
+
+.slotBadgeSelected {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.editableCell {
+  position: relative;
+}
+
+.officialStarters {
+  filter: grayscale(40%);
+  opacity: 0.8;
+}
+
+.saveFooter {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+
+.statusSaved {
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
+.statusError {
+  font-size: 0.75rem;
+  color: var(--color-error);
 }

@@ -185,7 +185,8 @@ type Lineup struct {
 	UserID    string    `json:"user_id"`
 	LeagueID  string    `json:"league_id"`
 	RosterID  int       `json:"roster_id"`
-	Week      int       `json:"week"`
+	WeekNumber int      `json:"week_number"`
+	Source    string    `json:"source"`
 	Starters  []string  `json:"starters"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

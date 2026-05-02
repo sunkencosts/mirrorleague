@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +16,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sunkencosts/mirror-me/internal/db"
 	"github.com/sunkencosts/mirror-me/internal/provider"
@@ -34,9 +38,22 @@ var testPlayers = []provider.Player{
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
+
+	migrateURL := "pgx5://mirrorme:mirrorme@localhost:5433/mirrorme_test"
+	mg, err := migrate.New("file://../../migrations", migrateURL)
+	if err != nil {
+		log.Fatalf("TestMain: create migrator: %v", err)
+	}
+	if err := mg.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		log.Fatalf("TestMain: migrate: %v", err)
+	}
+
 	pool, err := pgxpool.New(ctx, testDatabaseURL)
 	if err != nil {
 		log.Fatalf("TestMain: connect test db: %v", err)
+	}
+	if _, err := pool.Exec(ctx, "TRUNCATE lineups, players RESTART IDENTITY CASCADE"); err != nil {
+		log.Fatalf("TestMain: truncate: %v", err)
 	}
 	if err := db.NewStore(pool).UpsertPlayers(ctx, testPlayers); err != nil {
 		log.Fatalf("TestMain: seed players: %v", err)
@@ -48,6 +65,15 @@ func TestMain(m *testing.M) {
 
 func newTestServer(t *testing.T, sleeperHandler http.Handler, extraEnv ...map[string]string) string {
 	t.Helper()
+
+	pool, err := pgxpool.New(context.Background(), testDatabaseURL)
+	if err != nil {
+		t.Fatalf("newTestServer: connect db: %v", err)
+	}
+	if _, err := pool.Exec(context.Background(), "TRUNCATE lineups"); err != nil {
+		t.Fatalf("newTestServer: truncate lineups: %v", err)
+	}
+	pool.Close()
 
 	fakeSleeper := httptest.NewServer(sleeperHandler)
 	t.Cleanup(fakeSleeper.Close)
@@ -253,7 +279,7 @@ func lineupSleeperHandler() http.Handler {
 
 func createTestLineup(t *testing.T, baseURL string) provider.Lineup {
 	t.Helper()
-	body := `{"user_id":"user-abc","league_id":"test-league","roster_id":1,"week":1,"starters":["111","222"]}`
+	body := `{"user_id":"00000000-0000-0000-0000-000000000001","source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
 	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("createTestLineup: request failed: %v", err)
@@ -272,7 +298,7 @@ func createTestLineup(t *testing.T, baseURL string) provider.Lineup {
 func TestCreateLineup(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
 
-	body := `{"user_id":"user-abc","league_id":"test-league","roster_id":1,"week":1,"starters":["111","222"]}`
+	body := `{"user_id":"00000000-0000-0000-0000-000000000001","source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
 	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -292,8 +318,8 @@ func TestCreateLineup(t *testing.T) {
 	if loc := resp.Header.Get("Location"); loc != "/api/lineups/"+lineup.ID {
 		t.Errorf("expected Location header %q, got %q", "/api/lineups/"+lineup.ID, loc)
 	}
-	if lineup.UserID != "user-abc" {
-		t.Errorf("expected user_id %q, got %q", "user-abc", lineup.UserID)
+	if lineup.UserID != "00000000-0000-0000-0000-000000000001" {
+		t.Errorf("expected user_id %q, got %q", "00000000-0000-0000-0000-000000000001", lineup.UserID)
 	}
 	if lineup.LeagueID != "test-league" {
 		t.Errorf("expected league_id %q, got %q", "test-league", lineup.LeagueID)
@@ -301,8 +327,8 @@ func TestCreateLineup(t *testing.T) {
 	if lineup.RosterID != 1 {
 		t.Errorf("expected roster_id 1, got %d", lineup.RosterID)
 	}
-	if lineup.Week != 1 {
-		t.Errorf("expected week 1, got %d", lineup.Week)
+	if lineup.WeekNumber != 1 {
+		t.Errorf("expected week_number 1, got %d", lineup.WeekNumber)
 	}
 	if len(lineup.Starters) != 2 || lineup.Starters[0] != "111" || lineup.Starters[1] != "222" {
 		t.Errorf("unexpected starters: %v", lineup.Starters)
@@ -311,7 +337,7 @@ func TestCreateLineup(t *testing.T) {
 func TestCreateLineup_InvalidPlayer(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
 
-	body := `{"user_id":"user-abc","league_id":"test-league","roster_id":1,"week":1,"starters":["999"]}`
+	body := `{"user_id":"00000000-0000-0000-0000-000000000001","source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["999"]}`
 	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -361,7 +387,7 @@ func TestUpdateLineup(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
 	created := createTestLineup(t, baseURL)
 
-	body := `{"user_id":"user-abc","starters":["111","333"]}`
+	body := `{"user_id":"00000000-0000-0000-0000-000000000001","starters":["111","333"]}`
 	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/lineups/"+created.ID, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
@@ -386,7 +412,7 @@ func TestUpdateLineup_WrongUser(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
 	created := createTestLineup(t, baseURL)
 
-	body := `{"user_id":"someone-else","starters":["111"]}`
+	body := `{"user_id":"00000000-0000-0000-0000-000000000002","starters":["111"]}`
 	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/lineups/"+created.ID, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
@@ -403,7 +429,7 @@ func TestUpdateLineup_WrongUser(t *testing.T) {
 func TestUpdateLineup_NotFound(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
 
-	body := `{"user_id":"user-abc","starters":["111"]}`
+	body := `{"user_id":"00000000-0000-0000-0000-000000000001","starters":["111"]}`
 	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/lineups/00000000-0000-0000-0000-000000000000", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
@@ -414,5 +440,79 @@ func TestUpdateLineup_NotFound(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestListLineups_FilterByRoster(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+	created := createTestLineup(t, baseURL)
+
+	url := baseURL + "/api/lineups?user_id=" + created.UserID + "&league_id=test-league&week_number=1&roster_id=1"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var lineups []provider.Lineup
+	if err := json.NewDecoder(resp.Body).Decode(&lineups); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if len(lineups) != 1 {
+		t.Fatalf("expected 1 lineup, got %d", len(lineups))
+	}
+	if lineups[0].ID != created.ID {
+		t.Errorf("expected id %q, got %q", created.ID, lineups[0].ID)
+	}
+}
+
+func TestListLineups_All(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+	created := createTestLineup(t, baseURL)
+
+	url := baseURL + "/api/lineups?user_id=" + created.UserID + "&league_id=test-league&week_number=1"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var lineups []provider.Lineup
+	if err := json.NewDecoder(resp.Body).Decode(&lineups); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if len(lineups) != 1 {
+		t.Fatalf("expected 1 lineup, got %d", len(lineups))
+	}
+	if lineups[0].ID != created.ID {
+		t.Errorf("expected id %q, got %q", created.ID, lineups[0].ID)
+	}
+}
+
+func TestListLineups_Empty(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+
+	url := baseURL + "/api/lineups?user_id=00000000-0000-0000-0000-000000000001&league_id=test-league&week_number=99"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+	var lineups []provider.Lineup
+	if err := json.NewDecoder(resp.Body).Decode(&lineups); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if len(lineups) != 0 {
+		t.Errorf("expected empty array, got %d lineups", len(lineups))
 	}
 }

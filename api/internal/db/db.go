@@ -9,6 +9,16 @@ import (
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
 
+type scanner interface {
+	Scan(dest ...any) error
+}
+
+func scanLineup(row scanner) (provider.Lineup, error) {
+	var l provider.Lineup
+	err := row.Scan(&l.ID, &l.UserID, &l.LeagueID, &l.Source, &l.RosterID, &l.WeekNumber, &l.Starters, &l.CreatedAt, &l.UpdatedAt)
+	return l, err
+}
+
 type Store struct {
 	pool *pgxpool.Pool
 }
@@ -75,43 +85,69 @@ func (s *Store) GetPlayersByIDs(ctx context.Context, ids []string) (map[string]p
 	return result, nil
 }
 
-func (s *Store) CreateLineup(ctx context.Context, userID, leagueID string, rosterID, week int, starters []string) (provider.Lineup, error) {
-
-	var l provider.Lineup
-	err := s.pool.QueryRow(ctx, `
-					INSERT INTO lineups (user_id, league_id, roster_id, week, starters)
-					VALUES ($1, $2, $3, $4, $5)
-					RETURNING id, user_id, league_id, roster_id, week, starters, created_at, updated_at
-					`, userID, leagueID, rosterID, week, starters).Scan(
-		&l.ID, &l.UserID, &l.LeagueID, &l.RosterID, &l.Week, &l.Starters, &l.CreatedAt, &l.UpdatedAt)
+func (s *Store) CreateLineup(ctx context.Context, userID, leagueID, source string, rosterID, weekNumber int, starters []string) (provider.Lineup, error) {
+	row := s.pool.QueryRow(ctx, `
+		INSERT INTO lineups (user_id, league_id, source, roster_id, week_number, starters)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, user_id, league_id, source, roster_id, week_number, starters, created_at, updated_at
+	`, userID, leagueID, source, rosterID, weekNumber, starters)
+	l, err := scanLineup(row)
 	if err != nil {
 		return provider.Lineup{}, fmt.Errorf("creating lineup: %w", err)
 	}
 	return l, nil
 }
+
 func (s *Store) GetLineup(ctx context.Context, id string) (provider.Lineup, error) {
-	var l provider.Lineup
-	err := s.pool.QueryRow(ctx, `
-		SELECT id, user_id, league_id, roster_id, week, starters, created_at, updated_at
+	row := s.pool.QueryRow(ctx, `
+		SELECT id, user_id, league_id, source, roster_id, week_number, starters, created_at, updated_at
 		FROM lineups WHERE id = $1
-	`, id).Scan(
-		&l.ID, &l.UserID, &l.LeagueID, &l.RosterID, &l.Week, &l.Starters, &l.CreatedAt, &l.UpdatedAt,
-	)
+	`, id)
+	l, err := scanLineup(row)
 	if err != nil {
 		return provider.Lineup{}, fmt.Errorf("getting lineup %s: %w", id, err)
 	}
 	return l, nil
 }
+func (s *Store) ListLineups(ctx context.Context, userID, leagueID string, weekNumber int, rosterID *int) ([]provider.Lineup, error) {
+	query := `
+		SELECT id, user_id, league_id, source, roster_id, week_number, starters, created_at, updated_at
+		FROM lineups
+		WHERE user_id = $1 AND league_id = $2 AND week_number = $3`
+	args := []any{userID, leagueID, weekNumber}
+	if rosterID != nil {
+		query += ` AND roster_id = $4`
+		args = append(args, *rosterID)
+	}
+
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("listing lineups: %w", err)
+	}
+	defer rows.Close()
+
+	lineups := []provider.Lineup{}
+	for rows.Next() {
+		l, err := scanLineup(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scanning lineup: %w", err)
+		}
+		lineups = append(lineups, l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating lineups: %w", err)
+	}
+	return lineups, nil
+}
 
 func (s *Store) UpdateLineup(ctx context.Context, id string, starters []string) (provider.Lineup, error) {
-	var l provider.Lineup
-	err := s.pool.QueryRow(ctx, `
-				UPDATE lineups 
-				SET starters = $2, updated_at = now()
-				WHERE id = $1
-				RETURNING id, user_id, league_id, roster_id, week, starters, created_at, updated_at
-							`,
-		id, starters).Scan(&l.ID, &l.UserID, &l.LeagueID, &l.RosterID, &l.Week, &l.Starters, &l.CreatedAt, &l.UpdatedAt)
+	row := s.pool.QueryRow(ctx, `
+		UPDATE lineups
+		SET starters = $2, updated_at = now()
+		WHERE id = $1
+		RETURNING id, user_id, league_id, source, roster_id, week_number, starters, created_at, updated_at
+	`, id, starters)
+	l, err := scanLineup(row)
 	if err != nil {
 		return provider.Lineup{}, fmt.Errorf("updating lineup %s: %w", id, err)
 	}

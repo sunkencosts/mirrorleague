@@ -7,25 +7,23 @@ export const PROFILE_FALLBACK =
 
 interface Props {
   player: Player;
-  swapLabel?: string;
   isSelected?: boolean;
   eligibleSwaps?: SwapOption[];
-  onSwapClick?: () => void;
   onSwapSelect?: (opt: SwapOption) => void;
   onMoveToEmpty?: () => void;
+  reversed?: boolean;
 }
 export default function PlayerCard({
   player,
-  swapLabel,
   isSelected,
   eligibleSwaps,
-  onSwapClick,
   onSwapSelect,
   onMoveToEmpty,
+  reversed,
 }: Props) {
   return (
     <div
-      className={`${styles.playerCard} ${isSelected ? styles.selected : ""}`}
+      className={`${styles.playerCard} ${isSelected ? styles.selected : ""} ${reversed ? styles.reversed : ""}`}
     >
       <img
         style={{ boxShadow: RARITY_GLOW[player.rarity || "grey"] }}
@@ -44,17 +42,6 @@ export default function PlayerCard({
           {player.fantasy_positions[0]} · {player.team}
         </span>
       </div>
-
-      {onSwapClick && (
-        <button
-          type="button"
-          className={styles.swapBtn}
-          onClick={onSwapClick}
-          title="Swap player"
-        >
-          {swapLabel ?? "⇄"}
-        </button>
-      )}
 
       {isSelected && (
         <div className={styles.dropdown}>

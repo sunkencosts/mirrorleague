@@ -7,8 +7,8 @@
 }
 
 .playerCard img {
-  width: 52px;
-  height: 52px;
+  width: 42px;
+  height: 40px;
   border-radius: 50%;
   object-fit: cover;
   background: var(--border);
@@ -34,6 +34,14 @@
 /* .selected {
   box-shadow: inset 2px 0 0 var(--accent);
 } */
+
+.reversed {
+  flex-direction: row-reverse;
+}
+
+.reversed .playerInfo {
+  text-align: right;
+}
 
 .swapBtn {
   flex-shrink: 0;

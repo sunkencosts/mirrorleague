@@ -3,14 +3,22 @@ import type { Roster, League } from "./types";
 import RosterCard from "./components/RosterCard";
 import { computePowerScore } from "./scoring";
 import styles from "./App.module.css";
+import { useQuery } from "@tanstack/react-query";
+import type { Lineup } from "./types";
+
+interface LeagueConfig {
+  starterSlots: string[];
+  benchSlots: number;
+  irSlots: number;
+  taxiSlots: number;
+}
 
 export default function App() {
+  const [userId, setUserId] = useState("00000000-0000-0000-0000-000000000001");
+  const [weekNumber] = useState(1);
   const [leagueId, setLeagueId] = useState("1322995024962543616");
   const [rosters, setRosters] = useState<Roster[]>([]);
-  const [starterSlots, setStarterSlots] = useState<string[]>([]);
-  const [benchSlots, setBenchSlots] = useState(0);
-  const [irSlots, setIrSlots] = useState(0);
-  const [taxiSlots, setTaxiSlots] = useState(0);
+  const [leagueConfig, setLeagueConfig] = useState<LeagueConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,10 +27,7 @@ export default function App() {
     setLoading(true);
     setError(null);
     setRosters([]);
-    setStarterSlots([]);
-    setBenchSlots(0);
-    setIrSlots(0);
-    setTaxiSlots(0);
+    setLeagueConfig(null);
 
     try {
       const [leagueRes, rostersRes] = await Promise.all([
@@ -35,10 +40,12 @@ export default function App() {
         throw new Error(`${rostersRes.status} ${rostersRes.statusText}`);
       const league: League = await leagueRes.json();
       const data: Roster[] = await rostersRes.json();
-      setStarterSlots(league.roster_positions.filter((p) => p !== "BN"));
-      setBenchSlots(league.roster_positions.filter((p) => p === "BN").length);
-      setIrSlots(league.settings.reserve_slots);
-      setTaxiSlots(league.settings.taxi_slots);
+      setLeagueConfig({
+        starterSlots: league.roster_positions.filter((p) => p !== "BN"),
+        benchSlots: league.roster_positions.filter((p) => p === "BN").length,
+        irSlots: league.settings.reserve_slots,
+        taxiSlots: league.settings.taxi_slots,
+      });
       setRosters(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -51,13 +58,23 @@ export default function App() {
     () => rosters.map((r) => computePowerScore(r.players, r.starters)),
     [rosters],
   );
+  const { data: lineups = [], isLoading: lineupsLoading } = useQuery<Lineup[]>({
+    queryKey: ["lineups", userId, leagueId, weekNumber],
+    queryFn: () =>
+      fetch(
+        `/api/lineups?user_id=${userId}&league_id=${leagueId}&week_number=${weekNumber}`,
+      ).then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.json();
+      }),
+    enabled: rosters.length > 0,
+  });
 
   return (
     <div className={styles.app}>
       <header className={styles.header}>
         <h1>Mirror Me</h1>
         <p>Mirror a Sleeper league and set your own lineup</p>
-        <p>1182073403987832832</p>
       </header>
 
       <form onSubmit={fetchRosters} className={styles.leagueForm}>
@@ -68,6 +85,12 @@ export default function App() {
           onChange={(e) => setLeagueId(e.target.value)}
           required
         />
+        <input
+          type="text"
+          placeholder="Your user ID"
+          value={userId}
+          onChange={(e) => setUserId(e.target.value)}
+        />
         <button type="submit" disabled={loading}>
           {loading ? "Loading…" : "Load League"}
         </button>
@@ -75,18 +98,20 @@ export default function App() {
 
       {error && <p className={styles.error}>{error}</p>}
 
-      <div className={styles.rosterGrid}>
-        {rosters.map((roster) => (
-          <RosterCard
-            key={roster.roster_id}
-            roster={roster}
-            starterSlots={starterSlots}
-            benchSlots={benchSlots}
-            irSlots={irSlots}
-            taxiSlots={taxiSlots}
-            allScores={allScores}
-          />
-        ))}
+      <div className={styles.rosterList}>
+        {leagueConfig && !lineupsLoading &&
+          rosters.map((roster) => (
+            <RosterCard
+              key={roster.roster_id}
+              roster={roster}
+              {...leagueConfig}
+              allScores={allScores}
+              leagueId={leagueId}
+              userId={userId}
+              lineups={lineups}
+              weekNumber={weekNumber}
+            />
+          ))}
       </div>
     </div>
   );

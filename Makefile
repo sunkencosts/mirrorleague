@@ -12,6 +12,8 @@ db-stop:
 db-reset:
 	docker compose down -v
 	docker compose up -d
+	until docker compose exec db pg_isready -U postgres; do sleep 1; done
+	$(MAKE) migrate-up
 
 migrate-up:
 	cd api && go run ./cmd/migrate up

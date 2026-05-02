@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
+
+const rosterCacheTTL = 5 * time.Minute
 
 type roster struct {
 	RosterID int      `json:"roster_id"`
@@ -28,10 +31,18 @@ type leagueUser struct {
 	Metadata leagueUserMetadata `json:"metadata"`
 }
 
+type rosterCacheEntry struct {
+	rosters   []provider.Roster
+	fetchedAt time.Time
+}
+
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
 	players    playerLookup
+
+	rosterMu    sync.RWMutex
+	rosterCache map[string]rosterCacheEntry
 }
 
 type playerLookup interface {
@@ -40,9 +51,10 @@ type playerLookup interface {
 
 func New(baseURL string, players playerLookup) *Client {
 	return &Client{
-		baseURL:    baseURL,
-		httpClient: &http.Client{},
-		players:    players,
+		baseURL:     baseURL,
+		httpClient:  &http.Client{},
+		players:     players,
+		rosterCache: make(map[string]rosterCacheEntry),
 	}
 }
 
@@ -100,6 +112,26 @@ func (c *Client) GetLeague(ctx context.Context, leagueID string) (provider.Leagu
 }
 
 func (c *Client) GetRosters(ctx context.Context, leagueID string) ([]provider.Roster, error) {
+	c.rosterMu.RLock()
+	entry, ok := c.rosterCache[leagueID]
+	c.rosterMu.RUnlock()
+	if ok && time.Since(entry.fetchedAt) < rosterCacheTTL {
+		return entry.rosters, nil
+	}
+
+	rosters, err := c.fetchRosters(ctx, leagueID)
+	if err != nil {
+		return nil, err
+	}
+
+	c.rosterMu.Lock()
+	c.rosterCache[leagueID] = rosterCacheEntry{rosters: rosters, fetchedAt: time.Now()}
+	c.rosterMu.Unlock()
+
+	return rosters, nil
+}
+
+func (c *Client) fetchRosters(ctx context.Context, leagueID string) ([]provider.Roster, error) {
 	var wg sync.WaitGroup
 	var rawRosters []roster
 	var usersByID map[string]leagueUser
@@ -136,13 +168,14 @@ func (c *Client) GetRosters(ctx context.Context, leagueID string) ([]provider.Ro
 	if userErr != nil {
 		return nil, userErr
 	}
-	seen := map[string]bool{}
+
+	seen := map[string]struct{}{}
 	var allIDs []string
 	for _, r := range rawRosters {
 		for _, ids := range [][]string{r.Players, r.Starters, r.Reserve, r.Taxi} {
 			for _, id := range ids {
-				if !seen[id] {
-					seen[id] = true
+				if _, ok := seen[id]; !ok {
+					seen[id] = struct{}{}
 					allIDs = append(allIDs, id)
 				}
 			}

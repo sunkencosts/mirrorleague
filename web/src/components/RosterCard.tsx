@@ -1,37 +1,10 @@
-import { useState } from "react";
-import type { Roster, Player, SwapOption } from "../types";
+import { useMemo, useState } from "react";
+import { useLineup } from "../hooks/useLineup";
+import { canFillSlot, slotLabel } from "../slots";
+import type { Player, Roster, SwapOption, Lineup } from "../types";
 import PlayerCard, { PROFILE_FALLBACK } from "./PlayerCard";
-import RosterRarity from "./RosterRarity";
 import styles from "./RosterCard.module.css";
-
-const SLOT_DISPLAY: Record<string, string> = {
-  SUPER_FLEX: "SF",
-};
-
-function slotLabel(slot: string): string {
-  return SLOT_DISPLAY[slot] ?? slot;
-}
-
-const SLOT_ELIGIBILITY: Record<string, string[]> = {
-  QB: ["QB"],
-  RB: ["RB"],
-  WR: ["WR"],
-  TE: ["TE"],
-  K: ["K"],
-  DEF: ["DEF"],
-  FLEX: ["RB", "WR", "TE"],
-  SUPER_FLEX: ["QB", "RB", "WR", "TE"],
-  IDP_FLEX: ["DL", "LB", "DB"],
-  DL: ["DL"],
-  LB: ["LB"],
-  DB: ["DB"],
-};
-
-function canFillSlot(slot: string, player: Player): boolean {
-  const eligible = SLOT_ELIGIBILITY[slot];
-  if (!eligible) return false;
-  return player.fantasy_positions.some((pos) => eligible.includes(pos));
-}
+import RosterRarity from "./RosterRarity";
 
 interface Props {
   roster: Roster;
@@ -40,137 +13,243 @@ interface Props {
   irSlots: number;
   taxiSlots: number;
   allScores: number[];
+  leagueId: string;
+  weekNumber: number;
+  userId: string;
+  lineups: Lineup[];
 }
 
-export default function RosterCard({ roster, starterSlots, benchSlots, irSlots, taxiSlots, allScores }: Props) {
-  const [localStarters, setLocalStarters] = useState<(Player | null)[]>(
-    () => Array.from({ length: starterSlots.length }, (_, i) => roster.starters[i] ?? null),
-  );
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+interface StarterRowProps {
+  slot: string;
+  officialPlayer: Player | null;
+  myPlayer: Player | null;
+  isSelected: boolean;
+  eligibleSwaps?: SwapOption[];
+  bench: Player[];
+  hasEmptyBench: boolean;
+  onSelect: () => void;
+  onFillEmpty: (player: Player) => void;
+  onSwapSelect: (opt: SwapOption) => void;
+  onMoveToEmpty: () => void;
+}
 
-  const starterIds = new Set(localStarters.flatMap((p) => (p ? [p.player_id] : [])));
-  const bench = roster.players.filter((p) => !starterIds.has(p.player_id));
+function StarterRow({
+  slot,
+  officialPlayer,
+  myPlayer,
+  isSelected,
+  eligibleSwaps,
+  bench,
+  hasEmptyBench,
+  onSelect,
+  onFillEmpty,
+  onSwapSelect,
+  onMoveToEmpty,
+}: StarterRowProps) {
+  const eligible = bench.filter((b) => canFillSlot(slot, b));
+
+  return (
+    <div className={styles.starterRow}>
+      <div className={styles.officialStarters}>
+        {officialPlayer ? (
+          <PlayerCard player={officialPlayer} />
+        ) : (
+          <div className={styles.emptyStarterRow}>
+            <div className={styles.emptyAvatar} />
+            <span className={styles.emptyLabel}>Empty</span>
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        className={`${styles.slotBadge} ${isSelected ? styles.slotBadgeSelected : ""}`}
+        onClick={onSelect}
+      >
+        {slotLabel(slot)}
+      </button>
+
+      <div className={styles.editableCell}>
+        {myPlayer ? (
+          <PlayerCard
+            player={myPlayer}
+            isSelected={isSelected}
+            eligibleSwaps={eligibleSwaps}
+            onSwapSelect={onSwapSelect}
+            onMoveToEmpty={hasEmptyBench ? onMoveToEmpty : undefined}
+            reversed
+          />
+        ) : (
+          <>
+            <div className={`${styles.emptyStarterRow} ${styles.reversed}`}>
+              <div className={styles.emptyAvatar} />
+            </div>
+            {isSelected && (
+              <div className={styles.emptyDropdown}>
+                {eligible.length > 0 ? (
+                  eligible.map((b) => (
+                    <button
+                      key={b.player_id}
+                      type="button"
+                      className={styles.emptyDropdownItem}
+                      onClick={() => onFillEmpty(b)}
+                    >
+                      <img
+                        src={b.image_url}
+                        alt={`${b.first_name} ${b.last_name}`}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = PROFILE_FALLBACK;
+                        }}
+                      />
+                      <span className={styles.emptyDropdownName}>
+                        {b.first_name} {b.last_name}
+                      </span>
+                      <span className={styles.emptyDropdownMeta}>
+                        {b.fantasy_positions[0]} · {b.team}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className={styles.emptyDropdownEmpty}>
+                    No eligible bench players
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function RosterCard({
+  roster,
+  starterSlots,
+  benchSlots,
+  irSlots,
+  taxiSlots,
+  allScores,
+  leagueId,
+  weekNumber,
+  userId,
+  lineups,
+}: Props) {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const existingLineup =
+    lineups.find((l) => l.roster_id === roster.roster_id) ?? null;
+
+  const { localStarters, setLocalStarters, saveStatus, saveStarters } =
+    useLineup({
+      userId,
+      leagueId,
+      rosterId: roster.roster_id,
+      weekNumber,
+      players: roster.players,
+      initialStarters: roster.starters,
+      slotCount: starterSlots.length,
+      existingLineup,
+    });
+
+  const bench = useMemo(() => {
+    const starterIds = new Set(localStarters.flatMap((p) => (p ? [p.player_id] : [])));
+    return roster.players.filter((p) => !starterIds.has(p.player_id));
+  }, [localStarters, roster.players]);
   const hasEmptyBench = bench.length < benchSlots;
+
+  const eligibleSwaps = useMemo<SwapOption[] | null>(() => {
+    if (selectedIndex === null) return null;
+    const myPlayer = localStarters[selectedIndex];
+    const slot = starterSlots[selectedIndex];
+    if (!myPlayer) return null;
+    return [
+      ...localStarters
+        .filter(
+          (s, j): s is Player =>
+            s !== null &&
+            j !== selectedIndex &&
+            canFillSlot(starterSlots[j], myPlayer) &&
+            canFillSlot(slot, s),
+        )
+        .map((s) => ({ player: s, isBench: false })),
+      ...bench
+        .filter((b) => canFillSlot(slot, b))
+        .map((b) => ({ player: b, isBench: true })),
+    ];
+  }, [selectedIndex, localStarters, starterSlots, bench]);
 
   function select(i: number) {
     setSelectedIndex((prev) => (prev === i ? null : i));
   }
 
   function handleMoveToEmpty(i: number) {
-    setLocalStarters((prev) => prev.map((p, j) => (j === i ? null : p)));
+    const next = localStarters.map((p, j) => (j === i ? null : p));
+    setLocalStarters(next);
     setSelectedIndex(null);
+    saveStarters(next);
   }
 
   function handleFillEmpty(i: number, player: Player) {
-    setLocalStarters((prev) => prev.map((p, j) => (j === i ? player : p)));
+    const next = localStarters.map((p, j) => (j === i ? player : p));
+    setLocalStarters(next);
     setSelectedIndex(null);
+    saveStarters(next);
   }
 
   function handleSwapSelect(i: number, swapTarget: Player) {
-    const selectedPlayer = localStarters[i];
-    const targetIndex = localStarters.findIndex((p) => p?.player_id === swapTarget.player_id);
-
-    setLocalStarters((prev) =>
-      prev.map((p, j) => {
-        if (j === i) return swapTarget;
-        if (j === targetIndex) return selectedPlayer;
-        return p;
-      }),
-    );
+    const displaced = localStarters[i];
+    const next = localStarters.map((p, j) => {
+      if (j === i) return swapTarget;
+      if (p?.player_id === swapTarget.player_id) return displaced;
+      return p;
+    });
+    setLocalStarters(next);
     setSelectedIndex(null);
+    saveStarters(next);
   }
 
   const filledStarters = localStarters.filter(Boolean).length;
 
   return (
     <div className={styles.rosterCard}>
-      <h2>{roster.team_name || `Team ${roster.roster_id}`}</h2>
+      <div className={styles.cardHeader}>
+        <h2>{roster.team_name || `Team ${roster.roster_id}`}</h2>
+      </div>
 
       <RosterRarity
         players={roster.players}
-        starters={localStarters.filter((p): p is Player => p !== null)}
+        starters={roster.starters}
         allScores={allScores}
       />
 
       <div className={styles.section}>
-        <h3 className={styles.sectionLabel}>Starters · {filledStarters}/{starterSlots.length}</h3>
-        <div className={styles.playerList}>
-          {localStarters.map((player, i) => {
-            const slot = starterSlots[i];
-            const isSelected = selectedIndex === i;
-
-            if (!player) {
-              const eligible = bench.filter((b) => canFillSlot(slot, b));
-              return (
-                <div key={`empty-starter-${i}`} className={styles.emptyStarterRow}>
-                  <div className={styles.emptyAvatar} />
-                  <div style={{ flex: 1 }} />
-                  <button
-                    type="button"
-                    className={styles.emptyBtn}
-                    onClick={() => select(i)}
-                  >
-                    Empty
-                  </button>
-                  {isSelected && (
-                    <div className={styles.emptyDropdown}>
-                      {eligible.length > 0 ? (
-                        eligible.map((b) => (
-                          <button
-                            key={b.player_id}
-                            type="button"
-                            className={styles.emptyDropdownItem}
-                            onClick={() => handleFillEmpty(i, b)}
-                          >
-                            <img
-                              src={b.image_url}
-                              alt={`${b.first_name} ${b.last_name}`}
-                              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = PROFILE_FALLBACK; }}
-                            />
-                            <span className={styles.emptyDropdownName}>
-                              {b.first_name} {b.last_name}
-                            </span>
-                            <span className={styles.emptyDropdownMeta}>
-                              {b.fantasy_positions[0]} · {b.team}
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className={styles.emptyDropdownEmpty}>No eligible bench players</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            const eligibleSwaps: SwapOption[] | undefined = isSelected
-              ? [
-                  ...localStarters
-                    .filter(
-                      (s, j): s is Player =>
-                        s !== null &&
-                        j !== i &&
-                        canFillSlot(starterSlots[j], player) &&
-                        canFillSlot(slot, s),
-                    )
-                    .map((s) => ({ player: s, isBench: false })),
-                  ...bench
-                    .filter((b) => canFillSlot(slot, b))
-                    .map((b) => ({ player: b, isBench: true })),
-                ]
-              : undefined;
-
+        <div className={styles.starterRow}>
+          <h3 className={styles.sectionLabel}>Official Starters</h3>
+          <span />
+          <h3 className={styles.sectionLabel}>
+            Your Picks · {filledStarters}/{starterSlots.length}
+          </h3>
+        </div>
+        <div className={styles.starterGrid}>
+          {starterSlots.map((slot, i) => {
             return (
-              <PlayerCard
-                key={player.player_id}
-                player={player}
-                swapLabel={slotLabel(slot)}
-                isSelected={isSelected}
-                eligibleSwaps={eligibleSwaps}
-                onSwapClick={() => select(i)}
+              // biome-ignore lint/suspicious/noArrayIndexKey: slot rows are positional by design
+              <StarterRow
+                key={`starter-row-${i}`}
+                slot={slot}
+                officialPlayer={roster.starters[i] ?? null}
+                myPlayer={localStarters[i] ?? null}
+                isSelected={selectedIndex === i}
+                eligibleSwaps={
+                  selectedIndex === i ? (eligibleSwaps ?? undefined) : undefined
+                }
+                bench={bench}
+                hasEmptyBench={hasEmptyBench}
+                onSelect={() => select(i)}
+                onFillEmpty={(player) => handleFillEmpty(i, player)}
                 onSwapSelect={(opt) => handleSwapSelect(i, opt.player)}
-                onMoveToEmpty={hasEmptyBench ? () => handleMoveToEmpty(i) : undefined}
+                onMoveToEmpty={() => handleMoveToEmpty(i)}
               />
             );
           })}
@@ -178,33 +257,33 @@ export default function RosterCard({ roster, starterSlots, benchSlots, irSlots, 
       </div>
 
       <div className={styles.section}>
-        <h3 className={styles.sectionLabel}>Bench · {bench.length}/{benchSlots}</h3>
+        <h3 className={styles.sectionLabel}>
+          Bench · {bench.length}/{benchSlots}
+        </h3>
         <div className={styles.playerList}>
           {bench.map((player) => (
             <PlayerCard key={player.player_id} player={player} />
           ))}
-          {Array.from({ length: Math.max(0, benchSlots - bench.length) }).map((_, i) => (
-            <div key={`empty-${i}`} className={styles.emptyStarterRow}>
-              <div className={styles.emptyAvatar} />
-              <span className={styles.emptyLabel}>Empty</span>
-            </div>
-          ))}
+          {Array.from({ length: Math.max(0, benchSlots - bench.length) }).map(
+            (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: empty placeholder rows have no identity
+              <div key={`empty-${i}`} className={styles.emptyStarterRow}>
+                <div className={styles.emptyAvatar} />
+                <span className={styles.emptyLabel}>Empty</span>
+              </div>
+            ),
+          )}
         </div>
       </div>
 
       {irSlots > 0 && (
         <div className={styles.section}>
-          <h3 className={styles.sectionLabel}>IR · {roster.reserve.length}/{irSlots}</h3>
+          <h3 className={styles.sectionLabel}>
+            IR · {roster.reserve.length}/{irSlots}
+          </h3>
           <div className={styles.playerList}>
             {roster.reserve.map((player) => (
               <PlayerCard key={player.player_id} player={player} />
-            ))}
-            {Array.from({ length: Math.max(0, irSlots - roster.reserve.length) }).map((_, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: empty placeholder rows have no identity
-              <div key={`ir-empty-${i}`} className={styles.emptyStarterRow}>
-                <div className={styles.emptyAvatar} />
-                <span className={styles.emptyLabel}>Empty</span>
-              </div>
             ))}
           </div>
         </div>
@@ -212,19 +291,22 @@ export default function RosterCard({ roster, starterSlots, benchSlots, irSlots, 
 
       {taxiSlots > 0 && (
         <div className={styles.section}>
-          <h3 className={styles.sectionLabel}>Taxi · {roster.taxi.length}/{taxiSlots}</h3>
+          <h3 className={styles.sectionLabel}>
+            Taxi · {roster.taxi.length}/{taxiSlots}
+          </h3>
           <div className={styles.playerList}>
             {roster.taxi.map((player) => (
               <PlayerCard key={player.player_id} player={player} />
             ))}
-            {Array.from({ length: Math.max(0, taxiSlots - roster.taxi.length) }).map((_, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: empty placeholder rows have no identity
-              <div key={`taxi-empty-${i}`} className={styles.emptyStarterRow}>
-                <div className={styles.emptyAvatar} />
-                <span className={styles.emptyLabel}>Empty</span>
-              </div>
-            ))}
           </div>
+        </div>
+      )}
+
+      {saveStatus !== "idle" && (
+        <div className={styles.saveFooter}>
+          {saveStatus === "saving" && <span className={styles.statusSaved}>Saving…</span>}
+          {saveStatus === "saved" && <span className={styles.statusSaved}>Saved</span>}
+          {saveStatus === "error" && <span className={styles.statusError}>Save failed</span>}
         </div>
       )}
 
