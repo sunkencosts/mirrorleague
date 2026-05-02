@@ -77,6 +77,7 @@ function StarterRow({
             eligibleSwaps={eligibleSwaps}
             onSwapSelect={onSwapSelect}
             onMoveToEmpty={hasEmptyBench ? onMoveToEmpty : undefined}
+            onSelect={onSelect}
             reversed
           />
         ) : (

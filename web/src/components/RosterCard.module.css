@@ -104,6 +104,7 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
+  min-width: 220px;
   z-index: 10;
   background: var(--bg-elevated);
   border: 1px solid var(--border-ui);

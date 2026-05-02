@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import type { Roster, League } from "./types";
+import { Routes, Route, Navigate, useNavigate, useParams } from "react-router";
+import type { Lineup, Roster, League } from "./types";
 import RosterCard from "./components/RosterCard";
 import { computePowerScore } from "./scoring";
 import styles from "./App.module.css";
 import { useQuery } from "@tanstack/react-query";
-import type { Lineup } from "./types";
 
 interface LeagueConfig {
   starterSlots: string[];
@@ -13,51 +13,56 @@ interface LeagueConfig {
   taxiSlots: number;
 }
 
-export default function App() {
-  const [userId, setUserId] = useState("00000000-0000-0000-0000-000000000001");
-  const [weekNumber] = useState(1);
+function HomeForm() {
   const [leagueId, setLeagueId] = useState("1322995024962543616");
-  const [rosters, setRosters] = useState<Roster[]>([]);
-  const [leagueConfig, setLeagueConfig] = useState<LeagueConfig | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
-  async function fetchRosters(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setRosters([]);
-    setLeagueConfig(null);
-
-    try {
-      const [leagueRes, rostersRes] = await Promise.all([
-        fetch(`/api/league/${leagueId}`),
-        fetch(`/api/league/${leagueId}/rosters`),
-      ]);
-      if (!leagueRes.ok)
-        throw new Error(`${leagueRes.status} ${leagueRes.statusText}`);
-      if (!rostersRes.ok)
-        throw new Error(`${rostersRes.status} ${rostersRes.statusText}`);
-      const league: League = await leagueRes.json();
-      const data: Roster[] = await rostersRes.json();
-      setLeagueConfig({
-        starterSlots: league.roster_positions.filter((p) => p !== "BN"),
-        benchSlots: league.roster_positions.filter((p) => p === "BN").length,
-        irSlots: league.settings.reserve_slots,
-        taxiSlots: league.settings.taxi_slots,
-      });
-      setRosters(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
+    if (leagueId.trim()) navigate(`/league/${leagueId.trim()}`);
   }
 
-  const allScores = useMemo(
-    () => rosters.map((r) => computePowerScore(r.players, r.starters)),
-    [rosters],
+  return (
+    <form onSubmit={handleSubmit} className={styles.leagueForm}>
+      <input
+        type="text"
+        placeholder="Enter Sleeper league ID"
+        value={leagueId}
+        onChange={(e) => setLeagueId(e.target.value)}
+        required
+      />
+      <button type="submit">Load League</button>
+    </form>
   );
+}
+
+function LeaguePage() {
+  const { leagueId = "" } = useParams();
+  const userId = "00000000-0000-0000-0000-000000000001";
+  const weekNumber = 1;
+
+  const { data: league, isLoading: leagueLoading, error: leagueError } =
+    useQuery<League>({
+      queryKey: ["league", leagueId],
+      queryFn: () =>
+        fetch(`/api/league/${leagueId}`).then((r) => {
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          return r.json();
+        }),
+      enabled: !!leagueId,
+    });
+
+  const { data: rosters = [], isLoading: rostersLoading, error: rostersError } =
+    useQuery<Roster[]>({
+      queryKey: ["rosters", leagueId],
+      queryFn: () =>
+        fetch(`/api/league/${leagueId}/rosters`).then((r) => {
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          return r.json();
+        }),
+      enabled: !!leagueId,
+    });
+
   const { data: lineups = [], isLoading: lineupsLoading } = useQuery<Lineup[]>({
     queryKey: ["lineups", userId, leagueId, weekNumber],
     queryFn: () =>
@@ -67,9 +72,49 @@ export default function App() {
         if (!r.ok) throw new Error(`${r.status}`);
         return r.json();
       }),
-    enabled: rosters.length > 0,
+    enabled: !!leagueId,
   });
 
+  const leagueConfig = useMemo<LeagueConfig | null>(() => {
+    if (!league) return null;
+    const starterSlots = league.roster_positions.filter((p) => p !== "BN");
+    return {
+      starterSlots,
+      benchSlots: league.roster_positions.length - starterSlots.length,
+      irSlots: league.settings.reserve_slots,
+      taxiSlots: league.settings.taxi_slots,
+    };
+  }, [league]);
+
+  const allScores = useMemo(
+    () => rosters.map((r) => computePowerScore(r.players, r.starters)),
+    [rosters],
+  );
+
+  const error = leagueError ?? rostersError;
+  if (leagueLoading || rostersLoading || lineupsLoading) return <p>Loading…</p>;
+  if (error) return <p className={styles.error}>{error instanceof Error ? error.message : "Something went wrong"}</p>;
+  if (!leagueConfig) return null;
+
+  return (
+    <div className={styles.rosterList}>
+      {rosters.map((roster) => (
+        <RosterCard
+          key={roster.roster_id}
+          roster={roster}
+          {...leagueConfig}
+          allScores={allScores}
+          leagueId={leagueId}
+          userId={userId}
+          lineups={lineups}
+          weekNumber={weekNumber}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function App() {
   return (
     <div className={styles.app}>
       <header className={styles.header}>
@@ -77,42 +122,11 @@ export default function App() {
         <p>Mirror a Sleeper league and set your own lineup</p>
       </header>
 
-      <form onSubmit={fetchRosters} className={styles.leagueForm}>
-        <input
-          type="text"
-          placeholder="Enter Sleeper league ID"
-          value={leagueId}
-          onChange={(e) => setLeagueId(e.target.value)}
-          required
-        />
-        <input
-          type="text"
-          placeholder="Your user ID"
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? "Loading…" : "Load League"}
-        </button>
-      </form>
-
-      {error && <p className={styles.error}>{error}</p>}
-
-      <div className={styles.rosterList}>
-        {leagueConfig && !lineupsLoading &&
-          rosters.map((roster) => (
-            <RosterCard
-              key={roster.roster_id}
-              roster={roster}
-              {...leagueConfig}
-              allScores={allScores}
-              leagueId={leagueId}
-              userId={userId}
-              lineups={lineups}
-              weekNumber={weekNumber}
-            />
-          ))}
-      </div>
+      <Routes>
+        <Route path="/" element={<HomeForm />} />
+        <Route path="/league/:leagueId" element={<LeaguePage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 }

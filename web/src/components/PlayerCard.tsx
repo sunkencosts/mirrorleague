@@ -11,6 +11,7 @@ interface Props {
   eligibleSwaps?: SwapOption[];
   onSwapSelect?: (opt: SwapOption) => void;
   onMoveToEmpty?: () => void;
+  onSelect?: () => void;
   reversed?: boolean;
 }
 export default function PlayerCard({
@@ -19,6 +20,7 @@ export default function PlayerCard({
   eligibleSwaps,
   onSwapSelect,
   onMoveToEmpty,
+  onSelect,
   reversed,
 }: Props) {
   return (
@@ -26,9 +28,22 @@ export default function PlayerCard({
       className={`${styles.playerCard} ${isSelected ? styles.selected : ""} ${reversed ? styles.reversed : ""}`}
     >
       <img
-        style={{ boxShadow: RARITY_GLOW[player.rarity || "grey"] }}
+        style={{
+          boxShadow: RARITY_GLOW[player.rarity || "grey"],
+          cursor: onSelect ? "pointer" : undefined,
+        }}
         src={player.image_url}
         alt={`${player.first_name} ${player.last_name}`}
+        role={onSelect ? "button" : undefined}
+        tabIndex={onSelect ? 0 : undefined}
+        onClick={onSelect}
+        onKeyDown={
+          onSelect
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") onSelect();
+              }
+            : undefined
+        }
         onError={(e) => {
           e.currentTarget.onerror = null;
           e.currentTarget.src = PROFILE_FALLBACK;
