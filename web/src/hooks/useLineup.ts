@@ -62,8 +62,7 @@ export function useLineup({
 	// 1. The week changes (clear any pending picks)
 	// 2. A saved lineup appears for the first time for this week (initialize from server)
 	const weekChanged = state.seenWeek !== weekNumber;
-	const lineupFirstAppeared =
-		!weekChanged && state.lineupId === null && currentLineupId !== null;
+	const lineupFirstAppeared = !weekChanged && state.lineupId === null && currentLineupId !== null;
 	if (weekChanged || lineupFirstAppeared) {
 		setState({
 			seenWeek: weekNumber,

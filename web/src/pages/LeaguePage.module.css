@@ -1,10 +1,10 @@
 .rosterList {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr));
-  gap: 1rem;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr));
+	gap: 1rem;
 }
 
 .error {
-  color: var(--color-error);
-  margin-bottom: 1rem;
+	color: var(--color-error);
+	margin-bottom: 1rem;
 }
