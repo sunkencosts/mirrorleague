@@ -28,9 +28,15 @@ export interface Roster {
 
 export interface League {
   roster_positions: string[];
+  name: string;
+  scoring_settings: {
+    bonus_rec_te: number;
+    rec: number;
+  };
   settings: {
     reserve_slots: number;
     taxi_slots: number;
+    num_teams: number;
   };
 }
 
@@ -38,4 +44,11 @@ export interface Lineup {
   id: string;
   roster_id: number;
   starters: string[];
+}
+
+export interface LeagueConfig {
+  starterSlots: string[];
+  benchSlots: number;
+  irSlots: number;
+  taxiSlots: number;
 }
