@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useParams } from "react-router";
 import { fetchJson } from "../api";
-import styles from "../App.module.css";
+import styles from "./LeaguePage.module.css";
 import LeagueSummary from "../components/LeagueSummary";
 import RosterCard from "../components/RosterCard";
 import { computePowerScore } from "../scoring";

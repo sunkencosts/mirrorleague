@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import styles from "../App.module.css";
+import styles from "./HomePage.module.css";
 
 export default function HomePage() {
 	const [leagueId, setLeagueId] = useState("1322995024962543616");

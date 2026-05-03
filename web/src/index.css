@@ -25,4 +25,5 @@ body {
   font-family: system-ui, sans-serif;
   background: var(--bg-page);
   color: var(--text);
+  overflow-x: hidden;
 }
