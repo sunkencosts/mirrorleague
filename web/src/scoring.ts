@@ -15,14 +15,20 @@ export function computePowerScore(players: Player[], starters: Player[]): number
 	let total = 0;
 	let baseline = 0;
 	for (const p of players) {
-		if (!starterIds.has(p.player_id)) continue;
+		if (!starterIds.has(p.player_id)) {
+			continue;
+		}
 		const primaryPos = p.fantasy_positions?.[0];
-		if (!primaryPos || !(primaryPos in POSITION_MULTIPLIERS)) continue;
+		if (!primaryPos || !(primaryPos in POSITION_MULTIPLIERS)) {
+			continue;
+		}
 		const posMult = POSITION_MULTIPLIERS[primaryPos];
 		total += RARITY_POINTS[(p.rarity || "grey") as Rarity] * posMult;
 		baseline += RARITY_POINTS.purple * posMult;
 	}
-	if (baseline === 0) return 0;
+	if (baseline === 0) {
+		return 0;
+	}
 	return Math.min(10, (total / baseline) * 5);
 }
 
@@ -32,10 +38,18 @@ const ABSOLUTE_THRESHOLDS = { s: 9.0, a: 7.0, b: 5.0, c: 3.0 };
 const RELATIVE_THRESHOLDS = { s: 9.0, a: 7.0, b: 3.0, c: 1.0 };
 
 function getTierWithThresholds(score: number, t: typeof ABSOLUTE_THRESHOLDS): Tier {
-	if (score >= t.s) return "S";
-	if (score >= t.a) return "A";
-	if (score >= t.b) return "B";
-	if (score >= t.c) return "C";
+	if (score >= t.s) {
+		return "S";
+	}
+	if (score >= t.a) {
+		return "A";
+	}
+	if (score >= t.b) {
+		return "B";
+	}
+	if (score >= t.c) {
+		return "C";
+	}
 	return "D";
 }
 
@@ -48,10 +62,14 @@ export function getTier(score: number): Tier {
 }
 
 export function getTierRelative(score: number, allScores: number[]): Tier {
-	if (allScores.length <= 1) return getTier(score);
+	if (allScores.length <= 1) {
+		return getTier(score);
+	}
 	const min = Math.min(...allScores);
 	const max = Math.max(...allScores);
-	if (max === min) return getTier(score);
+	if (max === min) {
+		return getTier(score);
+	}
 	return tierFromRange(score, min, max);
 }
 

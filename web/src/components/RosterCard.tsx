@@ -198,12 +198,16 @@ export default function RosterCard({
 	);
 
 	function handleTogglePicker(i: number) {
-		if (saveStatus === "saving") return;
+		if (saveStatus === "saving") {
+			return;
+		}
 		setSelectedIndex((prev) => (prev === i ? null : i));
 	}
 
 	function handlePickOverride(i: number, player: Player) {
-		if (saveStatus === "saving") return;
+		if (saveStatus === "saving") {
+			return;
+		}
 		applyOverride(i, player);
 		setSelectedIndex(null);
 	}

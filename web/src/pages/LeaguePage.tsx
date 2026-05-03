@@ -42,7 +42,9 @@ export default function LeaguePage() {
 	});
 
 	const leagueConfig = useMemo<LeagueConfig | null>(() => {
-		if (!league) return null;
+		if (!league) {
+			return null;
+		}
 		const starterSlots = league.roster_positions.filter((p) => p !== "BN");
 		return {
 			starterSlots,
@@ -61,12 +63,13 @@ export default function LeaguePage() {
 	if (leagueLoading || rostersLoading) {
 		return <p>Loading…</p>;
 	}
-	if (error)
+	if (error) {
 		return (
 			<p className={styles.error}>
 				{error instanceof Error ? error.message : "Something went wrong"}
 			</p>
 		);
+	}
 	if (!leagueConfig || !league) {
 		return null;
 	}

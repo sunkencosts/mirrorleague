@@ -24,14 +24,18 @@ function buildOverrides(
 	players: Player[],
 	initialStarters: Player[],
 ): Record<number, Player> {
-	if (!existingLineup) return {};
+	if (!existingLineup) {
+		return {};
+	}
 	const playerMap = new Map(players.map((p) => [p.player_id, p]));
 	return existingLineup.starters.reduce(
 		(acc, id, i) => {
 			const official = initialStarters[i];
 			if (official?.player_id !== id) {
 				const player = playerMap.get(id);
-				if (player) acc[i] = player;
+				if (player) {
+					acc[i] = player;
+				}
 			}
 			return acc;
 		},
@@ -88,7 +92,9 @@ export function useLineup({
 						starters,
 					}),
 				}).then((r) => {
-					if (!r.ok) throw new Error(`${r.status}`);
+					if (!r.ok) {
+						throw new Error(`${r.status}`);
+					}
 					return r.json();
 				});
 			}
@@ -97,7 +103,9 @@ export function useLineup({
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ user_id: userId, starters }),
 			}).then((r) => {
-				if (!r.ok) throw new Error(`${r.status}`);
+				if (!r.ok) {
+					throw new Error(`${r.status}`);
+				}
 				return r.json();
 			});
 		},
@@ -116,7 +124,9 @@ export function useLineup({
 			{ length: slotCount },
 			(_, i) => next[i] ?? initialStarters[i] ?? null,
 		);
-		if (merged.some((p) => p === null)) return;
+		if (merged.some((p) => p === null)) {
+			return;
+		}
 		mutation.mutate((merged as Player[]).map((p) => p.player_id));
 	}
 

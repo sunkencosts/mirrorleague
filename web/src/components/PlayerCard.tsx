@@ -45,7 +45,9 @@ export default function PlayerCard({
 				onKeyDown={
 					onSelect
 						? (e) => {
-								if (e.key === "Enter" || e.key === " ") onSelect();
+								if (e.key === "Enter" || e.key === " ") {
+									onSelect();
+								}
 							}
 						: undefined
 				}

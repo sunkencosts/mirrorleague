@@ -25,6 +25,8 @@ export const SLOT_ELIGIBILITY: Record<string, string[]> = {
 
 export function canFillSlot(slot: string, player: Player): boolean {
 	const eligible = SLOT_ELIGIBILITY[slot];
-	if (!eligible) return false;
+	if (!eligible) {
+		return false;
+	}
 	return player.fantasy_positions.some((pos) => eligible.includes(pos));
 }

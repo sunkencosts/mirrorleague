@@ -8,7 +8,9 @@ export default function HomePage() {
 
 	function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault();
-		if (leagueId.trim()) navigate(`/league/${leagueId.trim()}`);
+		if (leagueId.trim()) {
+			navigate(`/league/${leagueId.trim()}`);
+		}
 	}
 
 	return (

@@ -9,8 +9,12 @@ interface Props {
 }
 
 const pprLabel = (rec: number) => {
-	if (rec === 1) return "FULL PPR";
-	if (rec === 0.5) return "HALF PPR";
+	if (rec === 1) {
+		return "FULL PPR";
+	}
+	if (rec === 0.5) {
+		return "HALF PPR";
+	}
 	return null;
 };
 
