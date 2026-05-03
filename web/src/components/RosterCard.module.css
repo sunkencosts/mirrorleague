@@ -5,7 +5,9 @@
   border: 1px solid var(--border);
 }
 
-.cardHeader {
+/* ── Team header ── */
+
+.teamHeader {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -13,11 +15,13 @@
   margin-bottom: 1.25rem;
 }
 
-.cardHeader h2 {
+.teamHeader h2 {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
 }
+
+/* ── Sections ── */
 
 .section + .section {
   margin-top: 1rem;
@@ -34,75 +38,233 @@
   color: var(--text-dim);
 }
 
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9;
+/* ── Column headers (above starter rows) ── */
+
+.columnHeaders {
+  display: grid;
+  grid-template-columns: 1fr 56px 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.colHeaderOfficial {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.colHeaderPick {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  text-align: right;
+}
+
+/* ── Starter grid ── */
+
+.starterGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.starterRow {
+  display: grid;
+  grid-template-columns: 1fr 56px 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* ── Left cell: official starter ── */
+
+.officialCell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  transition: opacity 0.2s ease;
+}
+
+.officialCell img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.officialDimmed {
+  opacity: 0.4;
+}
+
+.playerInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.playerName {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playerNameStruck {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+
+.playerMeta {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+/* ── Center cell: slot pill ── */
+
+.slotCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.slotPill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  margin-right: 10px;
+  margin-left: 10px;
+  height: 1.4rem;
+  font-family: monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-ui);
+  border-radius: 4px;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.slotPillOverridden {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.slotArrow {
+  font-size: 0.6rem;
+  color: var(--accent);
+  line-height: 1;
+}
+
+/* ── Right cell: pick or CTA ── */
+
+.pickCell {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.overrideChip {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.overrideChip img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* Button-specific reset and hover */
+.overrideChipBtn {
   background: none;
   border: none;
   padding: 0;
-  cursor: default;
+  cursor: pointer;
+  transition: opacity 0.15s;
 }
 
-.playerList {
+.overrideChipBtn:hover {
+  opacity: 0.7;
+}
+
+.pickInfo {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
 }
 
-.emptyStarterRow {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.25rem 0;
-}
-
-.emptyStarterRow.reversed {
-  flex-direction: row-reverse;
-}
-
-.emptyAvatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
-  border: 1px dashed var(--border-ui);
-  flex-shrink: 0;
-}
-
-.emptyLabel {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--border-ui);
-}
-
-.emptyBtn {
-  flex-shrink: 0;
-  width: 2.75rem;
-  background: none;
-  border: 1px dashed var(--border-ui);
-  border-radius: 4px;
-  color: var(--color-empty);
-  font-size: 0.7rem;
+.pickName {
+  font-size: 0.8rem;
   font-weight: 600;
-  padding: 0.2rem 0;
+  color: var(--text);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.pickMeta {
+  font-size: 0.68rem;
+  color: var(--accent-hover);
+  line-height: 1.2;
+  text-align: right;
+}
+
+/* "+ Override" CTA (when slot is unchanged) */
+.overrideCta {
+  position: relative;
+}
+
+.overrideBtn {
+  border: 1px dashed var(--border-ui);
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.35rem 1rem;
   cursor: pointer;
-  text-align: center;
   transition:
     color 0.15s,
     border-color 0.15s;
+  white-space: nowrap;
 }
 
-.emptyBtn:hover {
+.overrideBtn:hover {
   color: var(--accent-hover);
   border-color: var(--accent);
 }
 
-.emptyDropdown {
+/* Picker dropdown */
+.pickerDropdown {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
   right: 0;
   min-width: 220px;
   z-index: 10;
@@ -113,7 +275,7 @@
   overflow: hidden;
 }
 
-.emptyDropdownItem {
+.pickerItem {
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -128,15 +290,15 @@
   transition: background 0.1s;
 }
 
-.emptyDropdownItem:last-child {
+.pickerItem:last-child {
   border-bottom: none;
 }
 
-.emptyDropdownItem:hover {
+.pickerItem:hover {
   background: var(--bg-hover);
 }
 
-.emptyDropdownItem img {
+.pickerItem img {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -145,18 +307,18 @@
   flex-shrink: 0;
 }
 
-.emptyDropdownName {
+.pickerName {
   font-size: 0.8rem;
   font-weight: 500;
   flex: 1;
 }
 
-.emptyDropdownMeta {
+.pickerMeta {
   font-size: 0.7rem;
   color: var(--text-dim);
 }
 
-.emptyDropdownEmpty {
+.pickerEmpty {
   margin: 0;
   padding: 0.75rem;
   font-size: 0.8rem;
@@ -164,70 +326,43 @@
   font-style: italic;
 }
 
-.starterGrid {
+/* ── Empty slot (bye / IR) ── */
+
+.emptySlot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.emptyStarterRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.emptyAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border-ui);
+  flex-shrink: 0;
+}
+
+.emptyLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--border-ui);
+}
+
+/* ── Bench / IR / Taxi player list ── */
+
+.playerList {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
-
-.starterRow {
-  display: grid;
-  grid-template-columns: 1fr 2.5rem 1fr;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.slotBadge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-dim);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-ui);
-  border-radius: 4px;
-  height: 1.4rem;
-  padding: 0;
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    border-color 0.15s,
-    background 0.15s;
-}
-
-.slotBadge:hover {
-  color: var(--accent-hover);
-  border-color: var(--accent);
-}
-
-.slotBadgeSelected {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: var(--bg-hover);
-}
-
-.editableCell {
-  position: relative;
-}
-
-.officialStarters {
-  filter: grayscale(40%);
-  opacity: 0.8;
-}
-
-.saveFooter {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
 
 .statusSaved {
   font-size: 0.75rem;
@@ -237,4 +372,16 @@
 .statusError {
   font-size: 0.75rem;
   color: var(--color-error);
+}
+
+/* ── Backdrop (closes open pickers) ── */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: default;
 }

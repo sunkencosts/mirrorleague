@@ -1,93 +1,148 @@
-import { useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import type { Lineup, Player } from "../types";
 
 interface Params {
-  userId: string;
-  leagueId: string;
-  rosterId: number;
-  weekNumber: number;
-  players: Player[];
-  initialStarters: Player[];
-  slotCount: number;
-  existingLineup: Lineup | null;
+	userId: string;
+	leagueId: string;
+	rosterId: number;
+	weekNumber: number;
+	players: Player[];
+	initialStarters: Player[];
+	slotCount: number;
+	existingLineup: Lineup | null;
+}
+
+interface LineupState {
+	seenWeek: number;
+	lineupId: string | null;
+	overrides: Record<number, Player>;
+}
+
+function buildOverrides(
+	existingLineup: Lineup | null,
+	players: Player[],
+	initialStarters: Player[],
+): Record<number, Player> {
+	if (!existingLineup) return {};
+	const playerMap = new Map(players.map((p) => [p.player_id, p]));
+	return existingLineup.starters.reduce(
+		(acc, id, i) => {
+			const official = initialStarters[i];
+			if (official?.player_id !== id) {
+				const player = playerMap.get(id);
+				if (player) acc[i] = player;
+			}
+			return acc;
+		},
+		{} as Record<number, Player>,
+	);
 }
 
 export function useLineup({
-  userId,
-  leagueId,
-  rosterId,
-  weekNumber,
-  players,
-  initialStarters,
-  slotCount,
-  existingLineup,
+	userId,
+	leagueId,
+	rosterId,
+	weekNumber,
+	players,
+	initialStarters,
+	slotCount,
+	existingLineup,
 }: Params) {
-  const queryKey = ["lineups", userId, leagueId, weekNumber];
+	const queryKey = ["lineups", userId, leagueId, weekNumber];
+	const currentLineupId = existingLineup?.id ?? null;
 
-  const playerMap = useMemo(
-    () => new Map(players.map((p) => [p.player_id, p])),
-    [players],
-  );
+	const [state, setState] = useState<LineupState>(() => ({
+		seenWeek: weekNumber,
+		lineupId: currentLineupId,
+		overrides: buildOverrides(existingLineup, players, initialStarters),
+	}));
 
-  const [localStarters, setLocalStarters] = useState<(Player | null)[]>(() => {
-    if (existingLineup) {
-      return existingLineup.starters.map((id) => playerMap.get(id) ?? null);
-    }
-    return Array.from({ length: slotCount }, (_, i) => initialStarters[i] ?? null);
-  });
+	// getDerivedStateFromProps pattern — reset overrides when:
+	// 1. The week changes (clear any pending picks)
+	// 2. A saved lineup appears for the first time for this week (initialize from server)
+	const weekChanged = state.seenWeek !== weekNumber;
+	const lineupFirstAppeared =
+		!weekChanged && state.lineupId === null && currentLineupId !== null;
+	if (weekChanged || lineupFirstAppeared) {
+		setState({
+			seenWeek: weekNumber,
+			lineupId: currentLineupId,
+			overrides: buildOverrides(existingLineup, players, initialStarters),
+		});
+	}
 
-  const lineupIdRef = useRef<string | null>(existingLineup?.id ?? null);
+	const queryClient = useQueryClient();
 
-  const queryClient = useQueryClient();
+	const mutation = useMutation({
+		mutationFn: (starters: string[]) => {
+			if (state.lineupId === null) {
+				return fetch("/api/lineups", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						user_id: userId,
+						league_id: leagueId,
+						source: "sleeper",
+						roster_id: rosterId,
+						week_number: weekNumber,
+						starters,
+					}),
+				}).then((r) => {
+					if (!r.ok) throw new Error(`${r.status}`);
+					return r.json();
+				});
+			}
+			return fetch(`/api/lineups/${state.lineupId}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ user_id: userId, starters }),
+			}).then((r) => {
+				if (!r.ok) throw new Error(`${r.status}`);
+				return r.json();
+			});
+		},
+		onSuccess: (data) => {
+			if (state.lineupId === null) {
+				// Setting lineupId immediately prevents a refetch from triggering
+				// lineupFirstAppeared and overwriting picks made before the query lands.
+				setState((prev) => ({ ...prev, lineupId: data.id }));
+			}
+			queryClient.invalidateQueries({ queryKey });
+		},
+	});
 
-  const mutation = useMutation({
-    mutationFn: (starters: string[]) => {
-      if (lineupIdRef.current === null) {
-        return fetch("/api/lineups", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_id: userId,
-            league_id: leagueId,
-            source: "sleeper",
-            roster_id: rosterId,
-            week_number: weekNumber,
-            starters,
-          }),
-        }).then((r) => {
-          if (!r.ok) throw new Error(`${r.status}`);
-          return r.json();
-        });
-      }
-      return fetch(`/api/lineups/${lineupIdRef.current}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, starters }),
-      }).then((r) => {
-        if (!r.ok) throw new Error(`${r.status}`);
-        return r.json();
-      });
-    },
-    onSuccess: (data) => {
-      if (lineupIdRef.current === null) lineupIdRef.current = data.id;
-      queryClient.invalidateQueries({ queryKey });
-    },
-  });
+	function save(next: Record<number, Player>) {
+		const merged = Array.from(
+			{ length: slotCount },
+			(_, i) => next[i] ?? initialStarters[i] ?? null,
+		);
+		if (merged.some((p) => p === null)) return;
+		mutation.mutate((merged as Player[]).map((p) => p.player_id));
+	}
 
-  return {
-    localStarters,
-    setLocalStarters,
-    saveStatus: mutation.isPending
-      ? "saving"
-      : mutation.isError
-        ? "error"
-        : mutation.isSuccess
-          ? "saved"
-          : "idle",
-    saveStarters: (next: (Player | null)[]) => {
-      if (next.some((p) => p === null)) return;
-      mutation.mutate((next as Player[]).map((p) => p.player_id));
-    },
-  } as const;
+	function applyOverride(index: number, player: Player | null) {
+		const officialId = initialStarters[index]?.player_id;
+		let next: Record<number, Player>;
+		if (!player || player.player_id === officialId) {
+			next = { ...state.overrides };
+			delete next[index];
+		} else {
+			next = { ...state.overrides, [index]: player };
+		}
+		setState((prev) => ({ ...prev, overrides: next }));
+		save(next);
+	}
+
+	return {
+		overrides: state.overrides,
+		applyOverride,
+		saveStatus: mutation.isPending
+			? "saving"
+			: mutation.isError
+				? "error"
+				: mutation.isSuccess
+					? "saved"
+					: "idle",
+	} as const;
 }

@@ -1,13 +1,18 @@
+# ⚠️ Known Limitation
+- **Week traversal shows current rosters, not historical ones.** If a player was traded in week 10, going back to week 8 still shows them on their current team. Fix: use `/league/:leagueId/matchups/:week` (Sleeper API) instead of the current `/rosters` snapshot for past weeks. The rosters query needs to become week-aware.
+
 # FE
-- vert scroll cause shift when load is clicked.
+- Show scores red/green after player starts.
+- Use sleeper historical data to test.
+- navigation - back to leagueId entry
 - search for a player
-- Need to see scores by week? Week selector?
-- Need to see my vs their lineup. Official vs better.
 - figure out a better way to rank teams
 
+# Pages
+- Some type of stats page for the league? 
+- Some type of leaderboard for the entire site. Average closest to max points for? 
+
 # Database
-- if a user wants to submit a "better" lineup
-- if a user wants to edit their submitted lineup
 - User can see previously viewed leagueIds and set a nickname if they want.
 
 

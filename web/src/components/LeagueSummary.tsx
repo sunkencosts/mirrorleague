@@ -1,8 +1,11 @@
 import type { League } from "../types";
 import styles from "./LeagueSummary.module.css";
+import WeekSelector from "./WeekSelector";
 
 interface Props {
   league: League;
+  weekNumber: number;
+  onWeekChange: (week: number) => void;
 }
 
 const pprLabel = (rec: number) => {
@@ -18,6 +21,8 @@ export default function LeagueSummary({
     scoring_settings,
     settings: { num_teams },
   },
+  weekNumber,
+  onWeekChange,
 }: Props) {
   const ppr = pprLabel(scoring_settings.rec);
   const tep = scoring_settings.bonus_rec_te > 0;
@@ -27,9 +32,12 @@ export default function LeagueSummary({
     <div className={styles.container}>
       <div className={styles.header}>
         <span className={styles.leagueName}>{name}</span>
-        <span className={styles.teamCount}>{num_teams} TEAMS</span>
+        <WeekSelector weekNumber={weekNumber} onWeekChange={onWeekChange} />
       </div>
       <div className={styles.badges}>
+        <span className={styles.badge} style={{ color: "#94a3b8", borderColor: "#94a3b8" }}>
+          {num_teams} TEAMS
+        </span>
         {ppr && (
           <span className={styles.badge} style={{ color: "#4ade80", borderColor: "#4ade80" }}>
             {ppr}

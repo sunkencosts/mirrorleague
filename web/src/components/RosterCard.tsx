@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useLineup } from "../hooks/useLineup";
+import { RARITY_GLOW } from "../rarity";
 import { canFillSlot, slotLabel } from "../slots";
-import type { Player, Roster, SwapOption, Lineup } from "../types";
-import PlayerCard, { PROFILE_FALLBACK } from "./PlayerCard";
+import type { Lineup, Player, Roster } from "../types";
+import PlayerCard, { onImageError } from "./PlayerCard";
 import styles from "./RosterCard.module.css";
 import RosterRarity from "./RosterRarity";
 
@@ -22,103 +23,149 @@ interface Props {
 interface StarterRowProps {
   slot: string;
   officialPlayer: Player | null;
-  myPlayer: Player | null;
-  isSelected: boolean;
-  eligibleSwaps?: SwapOption[];
-  bench: Player[];
-  hasEmptyBench: boolean;
-  onSelect: () => void;
-  onFillEmpty: (player: Player) => void;
-  onSwapSelect: (opt: SwapOption) => void;
-  onMoveToEmpty: () => void;
+  overridePlayer: Player | null;
+  isPickerOpen: boolean;
+  eligiblePicks: Player[];
+  onTogglePicker: () => void;
+  onPickOverride: (player: Player) => void;
+  onClearOverride: () => void;
+}
+
+function OverrideChip({
+  player,
+  onClear,
+}: {
+  player: Player;
+  onClear: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`${styles.overrideChip} ${styles.overrideChipBtn}`}
+      onClick={onClear}
+      title="Click to remove override"
+    >
+      <img
+        style={{ boxShadow: RARITY_GLOW[player.rarity || "grey"] }}
+        src={player.image_url}
+        alt={`${player.first_name} ${player.last_name}`}
+        onError={onImageError}
+      />
+      <div className={styles.pickInfo}>
+        <span className={styles.pickName}>
+          {player.first_name} {player.last_name}
+        </span>
+        <span className={styles.pickMeta}>
+          {player.fantasy_positions[0]} · {player.team}
+        </span>
+      </div>
+    </button>
+  );
 }
 
 function StarterRow({
   slot,
   officialPlayer,
-  myPlayer,
-  isSelected,
-  eligibleSwaps,
-  bench,
-  hasEmptyBench,
-  onSelect,
-  onFillEmpty,
-  onSwapSelect,
-  onMoveToEmpty,
+  overridePlayer,
+  isPickerOpen,
+  eligiblePicks,
+  onTogglePicker,
+  onPickOverride,
+  onClearOverride,
 }: StarterRowProps) {
-  const eligible = bench.filter((b) => canFillSlot(slot, b));
+  const isOverridden = overridePlayer !== null;
 
   return (
     <div className={styles.starterRow}>
-      <div className={styles.officialStarters}>
+      {/* LEFT: official starter */}
+      <div
+        className={`${styles.officialCell} ${isOverridden ? styles.officialDimmed : ""}`}
+      >
         {officialPlayer ? (
-          <PlayerCard player={officialPlayer} />
+          <>
+            <img
+              style={{
+                boxShadow: isOverridden
+                  ? "0 0 0 1px #4b5563"
+                  : RARITY_GLOW[officialPlayer.rarity || "grey"],
+              }}
+              src={officialPlayer.image_url}
+              alt={`${officialPlayer.first_name} ${officialPlayer.last_name}`}
+              onError={onImageError}
+            />
+            <div className={styles.playerInfo}>
+              <span
+                className={`${styles.playerName} ${isOverridden ? styles.playerNameStruck : ""}`}
+              >
+                {officialPlayer.first_name} {officialPlayer.last_name}
+              </span>
+              <span className={styles.playerMeta}>
+                {officialPlayer.fantasy_positions[0]} · {officialPlayer.team}
+              </span>
+            </div>
+          </>
         ) : (
-          <div className={styles.emptyStarterRow}>
+          <div className={styles.emptySlot}>
             <div className={styles.emptyAvatar} />
             <span className={styles.emptyLabel}>Empty</span>
           </div>
         )}
       </div>
 
-      <button
-        type="button"
-        className={`${styles.slotBadge} ${isSelected ? styles.slotBadgeSelected : ""}`}
-        onClick={onSelect}
-      >
-        {slotLabel(slot)}
-      </button>
+      {/* CENTER: slot pill */}
+      <div className={styles.slotCell}>
+        <span
+          className={`${styles.slotPill} ${isOverridden ? styles.slotPillOverridden : ""}`}
+        >
+          {slotLabel(slot)}
+        </span>
+        {isOverridden && <span className={styles.slotArrow}> →</span>}
+      </div>
 
-      <div className={styles.editableCell}>
-        {myPlayer ? (
-          <PlayerCard
-            player={myPlayer}
-            isSelected={isSelected}
-            eligibleSwaps={eligibleSwaps}
-            onSwapSelect={onSwapSelect}
-            onMoveToEmpty={hasEmptyBench ? onMoveToEmpty : undefined}
-            onSelect={onSelect}
-            reversed
-          />
+      {/* RIGHT: override chip or CTA */}
+      <div className={styles.pickCell}>
+        {overridePlayer !== null ? (
+          <OverrideChip player={overridePlayer} onClear={onClearOverride} />
         ) : (
-          <>
-            <div className={`${styles.emptyStarterRow} ${styles.reversed}`}>
-              <div className={styles.emptyAvatar} />
-            </div>
-            {isSelected && (
-              <div className={styles.emptyDropdown}>
-                {eligible.length > 0 ? (
-                  eligible.map((b) => (
+          <div className={styles.overrideCta}>
+            <button
+              type="button"
+              className={styles.overrideBtn}
+              onClick={onTogglePicker}
+            >
+              + Override
+            </button>
+            {isPickerOpen && (
+              <div className={styles.pickerDropdown}>
+                {eligiblePicks.length > 0 ? (
+                  eligiblePicks.map((p) => (
                     <button
-                      key={b.player_id}
+                      key={p.player_id}
                       type="button"
-                      className={styles.emptyDropdownItem}
-                      onClick={() => onFillEmpty(b)}
+                      className={styles.pickerItem}
+                      onClick={() => onPickOverride(p)}
                     >
                       <img
-                        src={b.image_url}
-                        alt={`${b.first_name} ${b.last_name}`}
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = PROFILE_FALLBACK;
-                        }}
+                        src={p.image_url}
+                        alt={`${p.first_name} ${p.last_name}`}
+                        onError={onImageError}
                       />
-                      <span className={styles.emptyDropdownName}>
-                        {b.first_name} {b.last_name}
+                      <span className={styles.pickerName}>
+                        {p.first_name} {p.last_name}
                       </span>
-                      <span className={styles.emptyDropdownMeta}>
-                        {b.fantasy_positions[0]} · {b.team}
+                      <span className={styles.pickerMeta}>
+                        {p.fantasy_positions[0]} · {p.team}
                       </span>
                     </button>
                   ))
                 ) : (
-                  <p className={styles.emptyDropdownEmpty}>
+                  <p className={styles.pickerEmpty}>
                     No eligible bench players
                   </p>
                 )}
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -138,83 +185,61 @@ export default function RosterCard({
   lineups,
 }: Props) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const existingLineup =
-    lineups.find((l) => l.roster_id === roster.roster_id) ?? null;
 
-  const { localStarters, setLocalStarters, saveStatus, saveStarters } =
-    useLineup({
-      userId,
-      leagueId,
-      rosterId: roster.roster_id,
-      weekNumber,
-      players: roster.players,
-      initialStarters: roster.starters,
-      slotCount: starterSlots.length,
-      existingLineup,
-    });
+  const existingLineup = useMemo(
+    () => lineups.find((l) => l.roster_id === roster.roster_id) ?? null,
+    [lineups, roster.roster_id],
+  );
+
+  const { overrides, applyOverride, saveStatus } = useLineup({
+    userId,
+    leagueId,
+    rosterId: roster.roster_id,
+    weekNumber,
+    players: roster.players,
+    initialStarters: roster.starters,
+    slotCount: starterSlots.length,
+    existingLineup,
+  });
 
   const bench = useMemo(() => {
-    const starterIds = new Set(localStarters.flatMap((p) => (p ? [p.player_id] : [])));
-    return roster.players.filter((p) => !starterIds.has(p.player_id));
-  }, [localStarters, roster.players]);
-  const hasEmptyBench = bench.length < benchSlots;
+    const officialIds = new Set(roster.starters.map((p) => p.player_id));
+    const usedIds = new Set(Object.values(overrides).map((p) => p.player_id));
+    return roster.players.filter(
+      (p) => !officialIds.has(p.player_id) && !usedIds.has(p.player_id),
+    );
+  }, [roster.players, roster.starters, overrides]);
 
-  const eligibleSwaps = useMemo<SwapOption[] | null>(() => {
-    if (selectedIndex === null) return null;
-    const myPlayer = localStarters[selectedIndex];
-    const slot = starterSlots[selectedIndex];
-    if (!myPlayer) return null;
-    return [
-      ...localStarters
-        .filter(
-          (s, j): s is Player =>
-            s !== null &&
-            j !== selectedIndex &&
-            canFillSlot(starterSlots[j], myPlayer) &&
-            canFillSlot(slot, s),
-        )
-        .map((s) => ({ player: s, isBench: false })),
-      ...bench
-        .filter((b) => canFillSlot(slot, b))
-        .map((b) => ({ player: b, isBench: true })),
-    ];
-  }, [selectedIndex, localStarters, starterSlots, bench]);
+  const eligiblePicksBySlot = useMemo(
+    () => starterSlots.map((slot) => bench.filter((p) => canFillSlot(slot, p))),
+    [bench, starterSlots],
+  );
 
-  function select(i: number) {
+  function handleTogglePicker(i: number) {
+    if (saveStatus === "saving") return;
     setSelectedIndex((prev) => (prev === i ? null : i));
   }
 
-  function handleMoveToEmpty(i: number) {
-    const next = localStarters.map((p, j) => (j === i ? null : p));
-    setLocalStarters(next);
+  function handlePickOverride(i: number, player: Player) {
+    if (saveStatus === "saving") return;
+    applyOverride(i, player);
     setSelectedIndex(null);
-    saveStarters(next);
   }
 
-  function handleFillEmpty(i: number, player: Player) {
-    const next = localStarters.map((p, j) => (j === i ? player : p));
-    setLocalStarters(next);
-    setSelectedIndex(null);
-    saveStarters(next);
+  function handleClearOverride(i: number) {
+    applyOverride(i, null);
   }
 
-  function handleSwapSelect(i: number, swapTarget: Player) {
-    const displaced = localStarters[i];
-    const next = localStarters.map((p, j) => {
-      if (j === i) return swapTarget;
-      if (p?.player_id === swapTarget.player_id) return displaced;
-      return p;
-    });
-    setLocalStarters(next);
-    setSelectedIndex(null);
-    saveStarters(next);
-  }
-
-  const filledStarters = localStarters.filter(Boolean).length;
+  // Stable keys derived outside the map so biome's noArrayIndexKey rule doesn't fire.
+  // Slot names can repeat (e.g. two FLEX slots), so we include the position.
+  const slotKeys = useMemo(
+    () => starterSlots.map((slot, i) => `${slot}-${i}`),
+    [starterSlots],
+  );
 
   return (
     <div className={styles.rosterCard}>
-      <div className={styles.cardHeader}>
+      <div className={styles.teamHeader}>
         <h2>{roster.team_name || `Team ${roster.roster_id}`}</h2>
       </div>
 
@@ -225,35 +250,26 @@ export default function RosterCard({
       />
 
       <div className={styles.section}>
-        <div className={styles.starterRow}>
-          <h3 className={styles.sectionLabel}>Official Starters</h3>
+        <div className={styles.columnHeaders}>
+          <span className={styles.colHeaderOfficial}>Official</span>
           <span />
-          <h3 className={styles.sectionLabel}>
-            Your Picks · {filledStarters}/{starterSlots.length}
-          </h3>
+          <span className={styles.colHeaderPick}>Your Pick</span>
         </div>
+
         <div className={styles.starterGrid}>
-          {starterSlots.map((slot, i) => {
-            return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: slot rows are positional by design
-              <StarterRow
-                key={`starter-row-${i}`}
-                slot={slot}
-                officialPlayer={roster.starters[i] ?? null}
-                myPlayer={localStarters[i] ?? null}
-                isSelected={selectedIndex === i}
-                eligibleSwaps={
-                  selectedIndex === i ? (eligibleSwaps ?? undefined) : undefined
-                }
-                bench={bench}
-                hasEmptyBench={hasEmptyBench}
-                onSelect={() => select(i)}
-                onFillEmpty={(player) => handleFillEmpty(i, player)}
-                onSwapSelect={(opt) => handleSwapSelect(i, opt.player)}
-                onMoveToEmpty={() => handleMoveToEmpty(i)}
-              />
-            );
-          })}
+          {starterSlots.map((slot, i) => (
+            <StarterRow
+              key={slotKeys[i]}
+              slot={slot}
+              officialPlayer={roster.starters[i] ?? null}
+              overridePlayer={overrides[i] ?? null}
+              isPickerOpen={selectedIndex === i}
+              eligiblePicks={eligiblePicksBySlot[i]}
+              onTogglePicker={() => handleTogglePicker(i)}
+              onPickOverride={(player) => handlePickOverride(i, player)}
+              onClearOverride={() => handleClearOverride(i)}
+            />
+          ))}
         </div>
       </div>
 
@@ -300,14 +316,6 @@ export default function RosterCard({
               <PlayerCard key={player.player_id} player={player} />
             ))}
           </div>
-        </div>
-      )}
-
-      {saveStatus !== "idle" && (
-        <div className={styles.saveFooter}>
-          {saveStatus === "saving" && <span className={styles.statusSaved}>Saving…</span>}
-          {saveStatus === "saved" && <span className={styles.statusSaved}>Saved</span>}
-          {saveStatus === "error" && <span className={styles.statusError}>Save failed</span>}
         </div>
       )}
 

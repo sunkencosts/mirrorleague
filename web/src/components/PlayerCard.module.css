@@ -31,10 +31,6 @@
   color: var(--text-muted);
 }
 
-/* .selected {
-  box-shadow: inset 2px 0 0 var(--accent);
-} */
-
 .reversed {
   flex-direction: row-reverse;
 }

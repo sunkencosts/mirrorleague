@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { fetchJson } from "../api";
 import styles from "./LeaguePage.module.css";
@@ -9,10 +9,10 @@ import { computePowerScore } from "../scoring";
 import type { League, LeagueConfig, Lineup, Roster } from "../types";
 
 const userId = "00000000-0000-0000-0000-000000000001";
-const weekNumber = 1;
 
 export default function LeaguePage() {
   const { leagueId = "" } = useParams();
+  const [weekNumber, setWeekNumber] = useState(1);
 
   const {
     data: league,
@@ -34,7 +34,7 @@ export default function LeaguePage() {
     enabled: !!leagueId,
   });
 
-  const { data: lineups = [], isLoading: lineupsLoading } = useQuery<Lineup[]>({
+  const { data: lineups = [] } = useQuery<Lineup[]>({
     queryKey: ["lineups", userId, leagueId, weekNumber],
     queryFn: () =>
       fetchJson(
@@ -60,7 +60,7 @@ export default function LeaguePage() {
   );
 
   const error = leagueError ?? rostersError;
-  if (leagueLoading || rostersLoading || lineupsLoading) {
+  if (leagueLoading || rostersLoading) {
     return <p>Loading…</p>;
   }
   if (error)
@@ -75,7 +75,7 @@ export default function LeaguePage() {
 
   return (
     <>
-      <LeagueSummary league={league} />
+      <LeagueSummary league={league} weekNumber={weekNumber} onWeekChange={setWeekNumber} />
       <div className={styles.rosterList}>
         {rosters.map((roster) => (
           <RosterCard
