@@ -13,6 +13,7 @@ import (
 	"github.com/sunkencosts/mirror-me/pkg/config"
 )
 
+// Update api/api.md when adding or removing routes here.
 func addRoutes(mux *http.ServeMux, sleeperClient provider.Provider, store *db.Store, cfg config.Config) {
 	mux.Handle("POST /api/lineups", handlers.HandleCreateLineup(store, sleeperClient))
 	mux.Handle("PATCH /api/lineups/{id}", handlers.HandleUpdateLineup(store, sleeperClient))
