@@ -153,3 +153,74 @@ func (s *Store) UpdateLineup(ctx context.Context, id string, starters []string) 
 	}
 	return l, nil
 }
+
+func scanUserLeague(row scanner) (provider.UserLeague, error) {
+	var ul provider.UserLeague
+	err := row.Scan(&ul.UserID, &ul.LeagueID, &ul.Label, &ul.CreatedAt)
+	return ul, err
+}
+
+func (s *Store) SaveUserLeague(ctx context.Context, userID, leagueID, label string) (provider.UserLeague, error) {
+	row := s.pool.QueryRow(ctx, `
+		INSERT INTO league_bookmarks (user_id, league_id, label)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, league_id) DO UPDATE SET label = EXCLUDED.label
+		RETURNING user_id, league_id, label, created_at
+	`, userID, leagueID, label)
+	ul, err := scanUserLeague(row)
+	if err != nil {
+		return provider.UserLeague{}, fmt.Errorf("saving user league: %w", err)
+	}
+	return ul, nil
+}
+
+func (s *Store) ListUserLeagues(ctx context.Context, userID string) ([]provider.UserLeague, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT user_id, league_id, label, created_at
+		FROM league_bookmarks
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("listing user leagues: %w", err)
+	}
+	defer rows.Close()
+
+	leagues := []provider.UserLeague{}
+	for rows.Next() {
+		ul, err := scanUserLeague(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scanning user league: %w", err)
+		}
+		leagues = append(leagues, ul)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating user leagues: %w", err)
+	}
+	return leagues, nil
+}
+
+func (s *Store) UpdateUserLeague(ctx context.Context, userID, leagueID, label string) (provider.UserLeague, error) {
+	row := s.pool.QueryRow(ctx, `
+		UPDATE league_bookmarks
+		SET label = $3
+		WHERE user_id = $1 AND league_id = $2
+		RETURNING user_id, league_id, label, created_at
+	`, userID, leagueID, label)
+	ul, err := scanUserLeague(row)
+	if err != nil {
+		return provider.UserLeague{}, fmt.Errorf("updating user league: %w", err)
+	}
+	return ul, nil
+}
+
+func (s *Store) DeleteUserLeague(ctx context.Context, userID, leagueID string) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM league_bookmarks WHERE user_id = $1 AND league_id = $2`, userID, leagueID)
+	if err != nil {
+		return fmt.Errorf("deleting user league: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}

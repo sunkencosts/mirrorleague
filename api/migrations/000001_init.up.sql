@@ -24,3 +24,10 @@ CREATE TABLE lineups(
     CONSTRAINT lineups_key UNIQUE (user_id, league_id, roster_id, week_number, source)
 );
 
+CREATE TABLE league_bookmarks(
+    user_id     text NOT NULL,
+    league_id   text NOT NULL,
+    label       text NOT NULL DEFAULT '',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, league_id)
+);

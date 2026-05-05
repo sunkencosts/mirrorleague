@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalf("TestMain: connect test db: %v", err)
 	}
-	if _, err := pool.Exec(ctx, "TRUNCATE lineups, players RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := pool.Exec(ctx, "TRUNCATE lineups, players, league_bookmarks RESTART IDENTITY CASCADE"); err != nil {
 		log.Fatalf("TestMain: truncate: %v", err)
 	}
 	if err := db.NewStore(pool).UpsertPlayers(ctx, testPlayers); err != nil {
@@ -70,7 +70,7 @@ func newTestServer(t *testing.T, sleeperHandler http.Handler, extraEnv ...map[st
 	if err != nil {
 		t.Fatalf("newTestServer: connect db: %v", err)
 	}
-	if _, err := pool.Exec(context.Background(), "TRUNCATE lineups"); err != nil {
+	if _, err := pool.Exec(context.Background(), "TRUNCATE lineups, league_bookmarks"); err != nil {
 		t.Fatalf("newTestServer: truncate lineups: %v", err)
 	}
 	pool.Close()
@@ -514,5 +514,222 @@ func TestListLineups_Empty(t *testing.T) {
 	}
 	if len(lineups) != 0 {
 		t.Errorf("expected empty array, got %d lineups", len(lineups))
+	}
+}
+
+func noopHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+}
+
+func saveTestUserLeague(t *testing.T, baseURL, userID, leagueID, label string) provider.UserLeague {
+	t.Helper()
+	body := fmt.Sprintf(`{"user_id":%q,"league_id":%q,"label":%q}`, userID, leagueID, label)
+	resp, err := http.Post(baseURL+"/api/league-bookmarks", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("saveTestUserLeague: request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("saveTestUserLeague: expected 200, got %d", resp.StatusCode)
+	}
+	var ul provider.UserLeague
+	if err := json.NewDecoder(resp.Body).Decode(&ul); err != nil {
+		t.Fatalf("saveTestUserLeague: failed to decode: %v", err)
+	}
+	return ul
+}
+
+func TestSaveUserLeague(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	ul := saveTestUserLeague(t, baseURL, "user-a", "league-1", "My League")
+
+	if ul.UserID != "user-a" {
+		t.Errorf("expected user_id %q, got %q", "user-a", ul.UserID)
+	}
+	if ul.LeagueID != "league-1" {
+		t.Errorf("expected league_id %q, got %q", "league-1", ul.LeagueID)
+	}
+	if ul.Label != "My League" {
+		t.Errorf("expected label %q, got %q", "My League", ul.Label)
+	}
+}
+
+func TestListUserLeagues(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+	saveTestUserLeague(t, baseURL, "user-a", "league-1", "My League")
+
+	resp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-a")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var leagues []provider.UserLeague
+	if err := json.NewDecoder(resp.Body).Decode(&leagues); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if len(leagues) != 1 {
+		t.Fatalf("expected 1 league, got %d", len(leagues))
+	}
+	if leagues[0].LeagueID != "league-1" || leagues[0].Label != "My League" {
+		t.Errorf("unexpected league: %+v", leagues[0])
+	}
+}
+
+func TestListUserLeagues_Empty(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	resp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-nobody")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+	var leagues []provider.UserLeague
+	if err := json.NewDecoder(resp.Body).Decode(&leagues); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if len(leagues) != 0 {
+		t.Errorf("expected empty array, got %d leagues", len(leagues))
+	}
+}
+
+func TestListUserLeagues_Isolation(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+	saveTestUserLeague(t, baseURL, "user-a", "league-1", "User A League")
+
+	resp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-b")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var leagues []provider.UserLeague
+	if err := json.NewDecoder(resp.Body).Decode(&leagues); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if len(leagues) != 0 {
+		t.Errorf("expected user-b to see no leagues, got %d", len(leagues))
+	}
+}
+
+func TestSaveUserLeague_Upsert(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+	saveTestUserLeague(t, baseURL, "user-a", "league-1", "First Label")
+	ul := saveTestUserLeague(t, baseURL, "user-a", "league-1", "Updated Label")
+
+	if ul.Label != "Updated Label" {
+		t.Errorf("expected updated label, got %q", ul.Label)
+	}
+
+	resp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-a")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var leagues []provider.UserLeague
+	if err := json.NewDecoder(resp.Body).Decode(&leagues); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if len(leagues) != 1 {
+		t.Errorf("expected 1 entry after upsert, got %d", len(leagues))
+	}
+	if leagues[0].Label != "Updated Label" {
+		t.Errorf("expected %q, got %q", "Updated Label", leagues[0].Label)
+	}
+}
+
+func TestUpdateUserLeague(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+	saveTestUserLeague(t, baseURL, "user-a", "league-1", "Old Label")
+
+	body := `{"user_id":"user-a","label":"New Label"}`
+	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/league-bookmarks/league-1", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var ul provider.UserLeague
+	if err := json.NewDecoder(resp.Body).Decode(&ul); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if ul.Label != "New Label" {
+		t.Errorf("expected %q, got %q", "New Label", ul.Label)
+	}
+}
+
+func TestUpdateUserLeague_NotFound(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	body := `{"user_id":"user-a","label":"Whatever"}`
+	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/league-bookmarks/nonexistent", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestDeleteUserLeague(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+	saveTestUserLeague(t, baseURL, "user-a", "league-1", "To Delete")
+
+	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/api/league-bookmarks/league-1?user_id=user-a", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	listResp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-a")
+	if err != nil {
+		t.Fatalf("list request failed: %v", err)
+	}
+	defer listResp.Body.Close()
+
+	var leagues []provider.UserLeague
+	if err := json.NewDecoder(listResp.Body).Decode(&leagues); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if len(leagues) != 0 {
+		t.Errorf("expected empty list after delete, got %d", len(leagues))
+	}
+}
+
+func TestDeleteUserLeague_NotFound(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/api/league-bookmarks/nonexistent?user_id=user-a", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
 	}
 }

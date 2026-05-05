@@ -191,6 +191,13 @@ type Lineup struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+type UserLeague struct {
+	UserID    string    `json:"user_id"`
+	LeagueID  string    `json:"league_id"`
+	Label     string    `json:"label"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Provider interface {
 	GetRosters(ctx context.Context, leagueID string) ([]Roster, error)
 	GetLeague(ctx context.Context, leagueID string) (League, error)

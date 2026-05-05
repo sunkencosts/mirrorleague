@@ -196,6 +196,20 @@ func newTestServer(t *testing.T, externalAPIHandler http.Handler) string {
 }
 ```
 
+**TDD rule:** All new endpoints require TDD — write the failing tests first, then implement until they pass.
+
+**`TestMain` / `newTestServer` must TRUNCATE every table** that tests write to. Current list: `lineups`, `players`, `league_bookmarks`. Add new tables here when you add them.
+
+**New-endpoint checklist** — follow this sequence every time:
+1. Migration (`api/migrations/000001_init.up.sql`)
+2. Provider model (`internal/provider/provider.go`)
+3. DB methods (`internal/db/db.go`)
+4. Handler file (`internal/handlers/<name>.go`)
+5. Route (`cmd/server/routes.go`)
+6. Tests (`cmd/server/server_test.go`) — written first, before step 3
+
+---
+
 ### Key Models (internal/provider/provider.go)
 ```go
 type Player struct {

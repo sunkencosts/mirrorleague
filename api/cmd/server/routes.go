@@ -15,6 +15,10 @@ import (
 
 // Update api/api.md when adding or removing routes here.
 func addRoutes(mux *http.ServeMux, sleeperClient provider.Provider, store *db.Store, cfg config.Config) {
+	mux.Handle("POST /api/league-bookmarks", handlers.HandleSaveUserLeague(store))
+	mux.Handle("GET /api/league-bookmarks", handlers.HandleListUserLeagues(store))
+	mux.Handle("PATCH /api/league-bookmarks/{leagueId}", handlers.HandleUpdateUserLeague(store))
+	mux.Handle("DELETE /api/league-bookmarks/{leagueId}", handlers.HandleDeleteUserLeague(store))
 	mux.Handle("POST /api/lineups", handlers.HandleCreateLineup(store, sleeperClient))
 	mux.Handle("PATCH /api/lineups/{id}", handlers.HandleUpdateLineup(store, sleeperClient))
 	mux.Handle("GET /api/lineups", handlers.HandleListLineups(store))
