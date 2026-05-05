@@ -52,3 +52,10 @@ export interface LeagueConfig {
 	irSlots: number;
 	taxiSlots: number;
 }
+
+export interface LeagueBookmark {
+	user_id: string;
+	league_id: string;
+	label: string;
+	created_at: string;
+}

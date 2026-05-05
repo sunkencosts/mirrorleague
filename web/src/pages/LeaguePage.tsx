@@ -1,18 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
-import { fetchJson } from "../api";
+import { bookmarksKey, fetchJson, patchJson } from "../api";
 import LeagueSummary from "../components/LeagueSummary";
 import RosterCard from "../components/RosterCard";
+import { useUserId } from "../hooks/useUserId";
 import { computePowerScore } from "../scoring";
-import type { League, LeagueConfig, Lineup, Roster } from "../types";
+import type { League, LeagueBookmark, LeagueConfig, Lineup, Roster } from "../types";
 import styles from "./LeaguePage.module.css";
-
-const userId = "00000000-0000-0000-0000-000000000001";
 
 export default function LeaguePage() {
 	const { leagueId = "" } = useParams();
 	const [weekNumber, setWeekNumber] = useState(1);
+	const userId = useUserId();
+	const queryClient = useQueryClient();
 
 	const {
 		data: league,
@@ -40,6 +41,33 @@ export default function LeaguePage() {
 			fetchJson(`/api/lineups?user_id=${userId}&league_id=${leagueId}&week_number=${weekNumber}`),
 		enabled: !!leagueId,
 	});
+
+	const { data: bookmarks = [] } = useQuery<LeagueBookmark[]>({
+		queryKey: bookmarksKey(userId),
+		queryFn: () => fetchJson(`/api/league-bookmarks?user_id=${userId}`),
+	});
+
+	const { mutate: patchLabel } = useMutation({
+		mutationFn: (label: string) =>
+			patchJson<LeagueBookmark>(`/api/league-bookmarks/${leagueId}`, {
+				user_id: userId,
+				label,
+			}),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: bookmarksKey(userId) }),
+	});
+
+	const patched = useRef(false);
+	useEffect(() => {
+		if (patched.current || !league?.name) {
+			return;
+		}
+		const bookmark = bookmarks.find((b) => b.league_id === leagueId);
+		if (!bookmark || bookmark.label) {
+			return;
+		}
+		patched.current = true;
+		patchLabel(league.name);
+	}, [league, bookmarks, leagueId, patchLabel]);
 
 	const leagueConfig = useMemo<LeagueConfig | null>(() => {
 		if (!league) {

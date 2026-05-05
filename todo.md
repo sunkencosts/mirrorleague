@@ -13,7 +13,6 @@
 - Some type of leaderboard for the entire site. Average closest to max points for? 
 
 # Database
-- User can see previously viewed leagueIds and set a nickname if they want.
 
 
 
@@ -21,3 +20,8 @@ Entire point is to submit a better lineup and see if you beat the owner.
 - Testing should be easy. Just use 2025 data and simulate.
 - Incentive for teams who suck like Kevin, it's an incentive to stay involved in the league. Maybe the league says that they get a perk for setting the best lineup?
 - How can I claim a team and ask "who should I start" questions? Or is that implicit by allowing people to set any lineup.
+
+
+
+# Bugs
+- Bad league ID is not handled on "Connect league"
