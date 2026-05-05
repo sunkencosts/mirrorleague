@@ -6,6 +6,85 @@ Base path: `/api`
 
 ---
 
+## League Bookmarks
+
+A user's saved references to Sleeper leagues, with optional labels. `user_id` is a client-generated UUID stored locally by the frontend (no auth yet — will move to session in Step 3).
+
+### `POST /api/league-bookmarks`
+Save a league bookmark (upserts — if the league is already saved, the label is updated).
+
+**Request body**
+```json
+{
+  "user_id": "uuid",
+  "league_id": "string",
+  "label": "string"
+}
+```
+
+**Response** `200 OK`
+```json
+{
+  "user_id": "uuid",
+  "league_id": "string",
+  "label": "string",
+  "created_at": "RFC3339"
+}
+```
+
+---
+
+### `GET /api/league-bookmarks`
+List all bookmarks for a user.
+
+**Query params**
+| Param | Type | Required |
+|---|---|---|
+| `user_id` | UUID | yes |
+
+**Response** `200 OK`
+```json
+[{ /* LeagueBookmark */ }]
+```
+Returns an empty array if the user has no bookmarks.
+
+---
+
+### `PATCH /api/league-bookmarks/{leagueId}`
+Update the label on an existing bookmark.
+
+**Path params**
+- `leagueId` — Sleeper league ID
+
+**Request body**
+```json
+{
+  "user_id": "uuid",
+  "label": "string"
+}
+```
+
+**Response** `200 OK` — same shape as `POST /api/league-bookmarks`  
+**404** if no bookmark exists for that `user_id` + `leagueId`
+
+---
+
+### `DELETE /api/league-bookmarks/{leagueId}`
+Remove a bookmark.
+
+**Path params**
+- `leagueId` — Sleeper league ID
+
+**Query params**
+| Param | Type | Required |
+|---|---|---|
+| `user_id` | UUID | yes |
+
+**Response** `204 No Content`  
+**404** if no bookmark exists for that `user_id` + `leagueId`
+
+---
+
 ## Lineups
 
 ### `POST /api/lineups`
@@ -151,6 +230,16 @@ Pings the database. Used by the server's `waitForReady` check in tests and by lo
 ---
 
 ## Shared Types
+
+### LeagueBookmark
+```json
+{
+  "user_id": "uuid",
+  "league_id": "string",
+  "label": "string",
+  "created_at": "RFC3339"
+}
+```
 
 ### Player
 ```json
