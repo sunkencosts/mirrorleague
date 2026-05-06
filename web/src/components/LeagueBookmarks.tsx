@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { bookmarksKey, deleteJson, fetchJson, patchJson } from "../api";
 import type { LeagueBookmark } from "../types";
 import styles from "./LeagueBookmarks.module.css";
+import { CheckIcon, XIcon, PencilIcon, TrashIcon } from "./icons";
 
 interface Props {
 	userId: string;
@@ -109,19 +110,7 @@ export default function LeagueBookmarks({ userId }: Props) {
 												aria-label="Save"
 												title="Save"
 											>
-												<svg
-													width="15"
-													height="15"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													strokeWidth="2.5"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													aria-hidden="true"
-												>
-													<polyline points="20,6 9,17 4,12" />
-												</svg>
+												<CheckIcon />
 											</button>
 											<button
 												type="button"
@@ -130,20 +119,7 @@ export default function LeagueBookmarks({ userId }: Props) {
 												aria-label="Cancel"
 												title="Cancel"
 											>
-												<svg
-													width="15"
-													height="15"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													strokeWidth="2"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													aria-hidden="true"
-												>
-													<line x1="18" y1="6" x2="6" y2="18" />
-													<line x1="6" y1="6" x2="18" y2="18" />
-												</svg>
+												<XIcon />
 											</button>
 										</>
 									) : (
@@ -155,20 +131,7 @@ export default function LeagueBookmarks({ userId }: Props) {
 												aria-label="Edit label"
 												title="Edit label"
 											>
-												<svg
-													width="15"
-													height="15"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													strokeWidth="2"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													aria-hidden="true"
-												>
-													<path d="M12 20h9" />
-													<path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-												</svg>
+												<PencilIcon />
 											</button>
 											<button
 												type="button"
@@ -178,22 +141,7 @@ export default function LeagueBookmarks({ userId }: Props) {
 												aria-label="Delete bookmark"
 												title="Delete bookmark"
 											>
-												<svg
-													width="15"
-													height="15"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													strokeWidth="2"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													aria-hidden="true"
-												>
-													<polyline points="3,6 5,6 21,6" />
-													<path d="M19 6l-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6" />
-													<path d="M10 11v6M14 11v6" />
-													<path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-												</svg>
+												<TrashIcon />
 											</button>
 										</>
 									)}

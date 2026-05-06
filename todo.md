@@ -4,7 +4,6 @@
 # FE
 - Show scores red/green after player starts.
 - Use sleeper historical data to test.
-- navigation - back to leagueId entry
 - search for a player
 - figure out a better way to rank teams
 
