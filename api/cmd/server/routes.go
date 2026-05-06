@@ -16,6 +16,7 @@ import (
 type sleeperDeps interface {
 	provider.Provider
 	InvalidateRosters()
+	GetWeekMatchups(ctx context.Context, leagueID string, week int) ([]provider.WeekMatchup, error)
 }
 
 // Update api/api.md when adding or removing routes here.
@@ -29,6 +30,7 @@ func addRoutes(mux *http.ServeMux, sleeperClient sleeperDeps, store *db.Store, c
 	mux.Handle("GET /api/lineups", handlers.HandleListLineups(store))
 	mux.Handle("GET /api/lineups/{id}", handlers.HandleGetLineupByID(store))
 	mux.Handle("GET /api/league/{leagueId}/rosters", handlers.HandleGetRosters(sleeperClient))
+	mux.Handle("GET /api/league/{leagueId}/week/{week}", handlers.HandleGetWeekMatchups(sleeperClient))
 	mux.Handle("GET /api/league/{leagueId}", handlers.HandleGetLeague(sleeperClient))
 	mux.Handle("POST /api/admin/sync-players", handlers.HandleSyncPlayers(store, sleeperClient, cfg.SleeperBaseURL, cfg.RankingsCSVURL))
 	mux.HandleFunc("GET /healthz", handleHealthz(store))

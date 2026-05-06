@@ -180,6 +180,17 @@ type Roster struct {
 	Reserve  []Player `json:"reserve"`
 	Taxi     []Player `json:"taxi"`
 }
+type WeekMatchup struct {
+	RosterID     int      `json:"roster_id"`
+	MatchupID    int      `json:"matchup_id"`
+	OwnerID      string   `json:"owner_id"`
+	TeamName     string   `json:"team_name"`
+	Points       float64  `json:"points"`
+	CustomPoints *float64 `json:"custom_points"`
+	Players      []Player `json:"players"`
+	Starters     []Player `json:"starters"`
+}
+
 type Lineup struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`

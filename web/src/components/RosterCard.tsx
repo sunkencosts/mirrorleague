@@ -2,13 +2,14 @@ import { useMemo, useState } from "react";
 import { useLineup } from "../hooks/useLineup";
 import { RARITY_GLOW } from "../rarity";
 import { canFillSlot, slotLabel } from "../slots";
-import type { Lineup, Player, Roster } from "../types";
+import type { Lineup, Player, Roster, WeekMatchup } from "../types";
 import PlayerCard, { onImageError } from "./PlayerCard";
 import styles from "./RosterCard.module.css";
 import RosterRarity from "./RosterRarity";
 
 interface Props {
 	roster: Roster;
+	weekMatchup?: WeekMatchup | null;
 	starterSlots: string[];
 	benchSlots: number;
 	irSlots: number;
@@ -158,6 +159,7 @@ function StarterRow({
 
 export default function RosterCard({
 	roster,
+	weekMatchup,
 	starterSlots,
 	benchSlots,
 	irSlots,
@@ -170,6 +172,9 @@ export default function RosterCard({
 }: Props) {
 	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
+	const activePlayers = weekMatchup?.players ?? roster.players;
+	const activeStarters = weekMatchup?.starters ?? roster.starters;
+
 	const existingLineup = useMemo(
 		() => lineups.find((l) => l.roster_id === roster.roster_id) ?? null,
 		[lineups, roster.roster_id],
@@ -180,17 +185,17 @@ export default function RosterCard({
 		leagueId,
 		rosterId: roster.roster_id,
 		weekNumber,
-		players: roster.players,
-		initialStarters: roster.starters,
+		players: activePlayers,
+		initialStarters: activeStarters,
 		slotCount: starterSlots.length,
 		existingLineup,
 	});
 
 	const bench = useMemo(() => {
-		const officialIds = new Set(roster.starters.map((p) => p.player_id));
+		const officialIds = new Set(activeStarters.map((p) => p.player_id));
 		const usedIds = new Set(Object.values(overrides).map((p) => p.player_id));
-		return roster.players.filter((p) => !officialIds.has(p.player_id) && !usedIds.has(p.player_id));
-	}, [roster.players, roster.starters, overrides]);
+		return activePlayers.filter((p) => !officialIds.has(p.player_id) && !usedIds.has(p.player_id));
+	}, [activePlayers, activeStarters, overrides]);
 
 	const eligiblePicksBySlot = useMemo(
 		() => starterSlots.map((slot) => bench.filter((p) => canFillSlot(slot, p))),
@@ -224,9 +229,12 @@ export default function RosterCard({
 		<div className={styles.rosterCard}>
 			<div className={styles.teamHeader}>
 				<h2>{roster.team_name || `Team ${roster.roster_id}`}</h2>
+				{weekMatchup && (
+					<span>{(weekMatchup.custom_points ?? weekMatchup.points).toFixed(2)} pts</span>
+				)}
 			</div>
 
-			<RosterRarity players={roster.players} starters={roster.starters} allScores={allScores} />
+			<RosterRarity players={activePlayers} starters={activeStarters} allScores={allScores} />
 
 			<div className={styles.section}>
 				<div className={styles.columnHeaders}>
@@ -240,7 +248,7 @@ export default function RosterCard({
 						<StarterRow
 							key={slotKeys[i]}
 							slot={slot}
-							officialPlayer={roster.starters[i] ?? null}
+							officialPlayer={activeStarters[i] ?? null}
 							overridePlayer={overrides[i] ?? null}
 							isPickerOpen={selectedIndex === i}
 							eligiblePicks={eligiblePicksBySlot[i]}

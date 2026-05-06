@@ -39,7 +39,7 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 		return fmt.Errorf("pinging database: %w", err)
 	}
 	log.Println("database connected")
-	sleeperClient := sleeper.New(cfg.SleeperBaseURL, store)
+	sleeperClient := sleeper.New(cfg.SleeperBaseURL, store, cfg.CurrentWeek)
 
 	migrateURL := strings.Replace(cfg.DatabaseURL, "postgresql://", "pgx5://", 1)
 	migrateURL = strings.Replace(migrateURL, "postgres://", "pgx5://", 1)

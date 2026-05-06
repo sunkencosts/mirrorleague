@@ -1,17 +1,18 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef } from "react";
+import { useNavigate, useParams } from "react-router";
 import { bookmarksKey, fetchJson, patchJson } from "../api";
 import LeagueSummary from "../components/LeagueSummary";
 import RosterCard from "../components/RosterCard";
 import { useUserId } from "../hooks/useUserId";
 import { computePowerScore } from "../scoring";
-import type { League, LeagueBookmark, LeagueConfig, Lineup, Roster } from "../types";
+import type { League, LeagueBookmark, LeagueConfig, Lineup, Roster, WeekMatchup } from "../types";
 import styles from "./LeaguePage.module.css";
 
 export default function LeaguePage() {
-	const { leagueId = "" } = useParams();
-	const [weekNumber, setWeekNumber] = useState(1);
+	const { leagueId = "", week } = useParams();
+	const weekNumber = week ? parseInt(week, 10) : 1;
+	const navigate = useNavigate();
 	const userId = useUserId();
 	const queryClient = useQueryClient();
 
@@ -34,6 +35,19 @@ export default function LeaguePage() {
 		queryFn: () => fetchJson(`/api/league/${leagueId}/rosters`),
 		enabled: !!leagueId,
 	});
+
+	const { data: weekMatchups = [] } = useQuery<WeekMatchup[]>({
+		queryKey: ["week-matchups", leagueId, weekNumber],
+		queryFn: () => fetchJson(`/api/league/${leagueId}/week/${weekNumber}`),
+		select: (data) => data ?? [],
+		placeholderData: keepPreviousData,
+		enabled: !!leagueId,
+	});
+
+	const matchupByRosterId = useMemo(
+		() => new Map(weekMatchups.map((m) => [m.roster_id, m])),
+		[weekMatchups],
+	);
 
 	const { data: lineups = [] } = useQuery<Lineup[]>({
 		queryKey: ["lineups", userId, leagueId, weekNumber],
@@ -104,12 +118,17 @@ export default function LeaguePage() {
 
 	return (
 		<>
-			<LeagueSummary league={league} weekNumber={weekNumber} onWeekChange={setWeekNumber} />
+			<LeagueSummary
+				league={league}
+				weekNumber={weekNumber}
+				onWeekChange={(w) => navigate(`/league/${leagueId}/week/${w}`)}
+			/>
 			<div className={styles.rosterList}>
 				{rosters.map((roster) => (
 					<RosterCard
 						key={roster.roster_id}
 						roster={roster}
+						weekMatchup={matchupByRosterId.get(roster.roster_id) ?? null}
 						{...leagueConfig}
 						allScores={allScores}
 						leagueId={leagueId}

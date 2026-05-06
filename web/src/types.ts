@@ -53,6 +53,17 @@ export interface LeagueConfig {
 	taxiSlots: number;
 }
 
+export interface WeekMatchup {
+	roster_id: number;
+	matchup_id: number;
+	owner_id: string;
+	team_name: string;
+	points: number;
+	custom_points: number | null;
+	players: Player[];
+	starters: Player[];
+}
+
 export interface LeagueBookmark {
 	user_id: string;
 	league_id: string;

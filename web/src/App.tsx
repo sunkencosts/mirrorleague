@@ -9,6 +9,7 @@ export default function App() {
 			<Route element={<Layout />}>
 				<Route path="/" element={<HomePage />} />
 				<Route path="/league/:leagueId" element={<LeaguePage />} />
+				<Route path="/league/:leagueId/week/:week" element={<LeaguePage />} />
 				<Route path="*" element={<Navigate to="/" replace />} />
 			</Route>
 		</Routes>

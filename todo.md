@@ -1,5 +1,5 @@
-# ⚠️ Known Limitation
-- **Week traversal shows current rosters, not historical ones.** If a player was traded in week 10, going back to week 8 still shows them on their current team. Fix: use `/league/:leagueId/matchups/:week` (Sleeper API) instead of the current `/rosters` snapshot for past weeks. The rosters query needs to become week-aware.
+# Next
+The sleeper route https://api.sleeper.app/v1/league/1182073403987832832/matchups/1 returns the player scores for the matchup. We need to return these in our matchup routes. Basically we want to know, for every week, what did every player in the matchup score? We also need to double check that the lineup feature works only players that were on the team at the time. Like, can I scroll back and override with a new addition to the team that wasn't there at the time?
 
 # FE
 - Show scores red/green after player starts.

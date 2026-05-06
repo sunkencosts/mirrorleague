@@ -5,13 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
 
-const rosterCacheTTL = 5 * time.Minute
+const (
+	rosterCacheTTL           = 5 * time.Minute
+	matchupCacheTTLHistorical = 24 * time.Hour
+	matchupCacheTTLCurrent   = 2 * time.Minute
+)
 
 type roster struct {
 	RosterID int      `json:"roster_id"`
@@ -36,25 +41,45 @@ type rosterCacheEntry struct {
 	fetchedAt time.Time
 }
 
+type matchupCacheEntry struct {
+	matchups  []provider.WeekMatchup
+	fetchedAt time.Time
+}
+
+type matchupEntry struct {
+	RosterID     int      `json:"roster_id"`
+	MatchupID    int      `json:"matchup_id"`
+	Players      []string `json:"players"`
+	Starters     []string `json:"starters"`
+	Points       float64  `json:"points"`
+	CustomPoints *float64 `json:"custom_points"`
+}
+
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
 	players    playerLookup
+	currentWeek int
 
 	rosterMu    sync.RWMutex
 	rosterCache map[string]rosterCacheEntry
+
+	matchupMu    sync.RWMutex
+	matchupCache map[string]matchupCacheEntry
 }
 
 type playerLookup interface {
 	GetPlayersByIDs(ctx context.Context, ids []string) (map[string]provider.Player, error)
 }
 
-func New(baseURL string, players playerLookup) *Client {
+func New(baseURL string, players playerLookup, currentWeek int) *Client {
 	return &Client{
-		baseURL:     baseURL,
-		httpClient:  &http.Client{},
-		players:     players,
-		rosterCache: make(map[string]rosterCacheEntry),
+		baseURL:      baseURL,
+		httpClient:   &http.Client{},
+		players:      players,
+		currentWeek:  currentWeek,
+		rosterCache:  make(map[string]rosterCacheEntry),
+		matchupCache: make(map[string]matchupCacheEntry),
 	}
 }
 
@@ -73,6 +98,20 @@ func (c *Client) resolvePlayers(playerMap map[string]provider.Player, ids []stri
 		}
 	}
 	return players
+}
+
+func collectPlayerIDs(slices ...[]string) []string {
+	seen := map[string]struct{}{}
+	var ids []string
+	for _, s := range slices {
+		for _, id := range s {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids
 }
 
 func (c *Client) getLeagueUsers(ctx context.Context, leagueID string) (map[string]leagueUser, error) {
@@ -175,18 +214,11 @@ func (c *Client) fetchRosters(ctx context.Context, leagueID string) ([]provider.
 		return nil, userErr
 	}
 
-	seen := map[string]struct{}{}
-	var allIDs []string
+	var playerSlices [][]string
 	for _, r := range rawRosters {
-		for _, ids := range [][]string{r.Players, r.Starters, r.Reserve, r.Taxi} {
-			for _, id := range ids {
-				if _, ok := seen[id]; !ok {
-					seen[id] = struct{}{}
-					allIDs = append(allIDs, id)
-				}
-			}
-		}
+		playerSlices = append(playerSlices, r.Players, r.Starters, r.Reserve, r.Taxi)
 	}
+	allIDs := collectPlayerIDs(playerSlices...)
 
 	playerMap, err := c.players.GetPlayersByIDs(ctx, allIDs)
 	if err != nil {
@@ -207,6 +239,105 @@ func (c *Client) fetchRosters(ctx context.Context, leagueID string) ([]provider.
 			Starters: c.resolvePlayers(playerMap, r.Starters),
 			Reserve:  c.resolvePlayers(playerMap, r.Reserve),
 			Taxi:     c.resolvePlayers(playerMap, r.Taxi),
+		})
+	}
+
+	return result, nil
+}
+
+func (c *Client) GetWeekMatchups(ctx context.Context, leagueID string, week int) ([]provider.WeekMatchup, error) {
+	cacheKey := leagueID + "/" + strconv.Itoa(week)
+	ttl := matchupCacheTTLCurrent
+	if week < c.currentWeek {
+		ttl = matchupCacheTTLHistorical
+	}
+
+	c.matchupMu.RLock()
+	entry, ok := c.matchupCache[cacheKey]
+	c.matchupMu.RUnlock()
+	if ok && time.Since(entry.fetchedAt) < ttl {
+		return entry.matchups, nil
+	}
+
+	matchups, err := c.fetchWeekMatchups(ctx, leagueID, week)
+	if err != nil {
+		return nil, err
+	}
+
+	c.matchupMu.Lock()
+	c.matchupCache[cacheKey] = matchupCacheEntry{matchups: matchups, fetchedAt: time.Now()}
+	c.matchupMu.Unlock()
+
+	return matchups, nil
+}
+
+func (c *Client) fetchWeekMatchups(ctx context.Context, leagueID string, week int) ([]provider.WeekMatchup, error) {
+	var wg sync.WaitGroup
+	var rawMatchups []matchupEntry
+	var rosters []provider.Roster
+	var matchupErr, rosterErr error
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		url := c.baseURL + "/league/" + leagueID + "/matchups/" + strconv.Itoa(week)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			matchupErr = fmt.Errorf("creating matchups request: %w", err)
+			return
+		}
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			matchupErr = fmt.Errorf("getting matchups for league %s week %d: %w", leagueID, week, err)
+			return
+		}
+		defer resp.Body.Close()
+		if err := json.NewDecoder(resp.Body).Decode(&rawMatchups); err != nil {
+			matchupErr = fmt.Errorf("decoding matchups: %w", err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		rosters, rosterErr = c.GetRosters(ctx, leagueID)
+	}()
+	wg.Wait()
+
+	if matchupErr != nil {
+		return nil, matchupErr
+	}
+	if rosterErr != nil {
+		return nil, rosterErr
+	}
+
+	ownerByRosterID := make(map[int]string, len(rosters))
+	teamNameByRosterID := make(map[int]string, len(rosters))
+	for _, r := range rosters {
+		ownerByRosterID[r.RosterID] = r.OwnerID
+		teamNameByRosterID[r.RosterID] = r.TeamName
+	}
+
+	var playerSlices [][]string
+	for _, m := range rawMatchups {
+		playerSlices = append(playerSlices, m.Players, m.Starters)
+	}
+	allIDs := collectPlayerIDs(playerSlices...)
+
+	playerMap, err := c.players.GetPlayersByIDs(ctx, allIDs)
+	if err != nil {
+		return nil, fmt.Errorf("fetching players: %w", err)
+	}
+
+	var result []provider.WeekMatchup
+	for _, m := range rawMatchups {
+		result = append(result, provider.WeekMatchup{
+			RosterID:     m.RosterID,
+			MatchupID:    m.MatchupID,
+			OwnerID:      ownerByRosterID[m.RosterID],
+			TeamName:     teamNameByRosterID[m.RosterID],
+			Points:       m.Points,
+			CustomPoints: m.CustomPoints,
+			Players:      c.resolvePlayers(playerMap, m.Players),
+			Starters:     c.resolvePlayers(playerMap, m.Starters),
 		})
 	}
 

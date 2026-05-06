@@ -1,11 +1,14 @@
 package config
 
+import "strconv"
+
 type Config struct {
 	Port           string
 	SleeperBaseURL string
 	RankingsCSVURL string
 	DatabaseURL    string
 	MigrationsURL  string
+	CurrentWeek    int
 }
 
 func Load(getenv func(string) string) Config {
@@ -29,11 +32,18 @@ func Load(getenv func(string) string) Config {
 	if migrationsURL == "" {
 		migrationsURL = "file://migrations"
 	}
+	currentWeek := 1
+	if s := getenv("CURRENT_WEEK"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil {
+			currentWeek = n
+		}
+	}
 	return Config{
 		Port:           port,
 		SleeperBaseURL: sleeperBaseURL,
 		RankingsCSVURL: rankingsCSVURL,
 		DatabaseURL:    databaseURL,
 		MigrationsURL:  migrationsURL,
+		CurrentWeek:    currentWeek,
 	}
 }

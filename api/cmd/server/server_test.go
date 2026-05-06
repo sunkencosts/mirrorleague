@@ -517,6 +517,88 @@ func TestListLineups_Empty(t *testing.T) {
 	}
 }
 
+func TestGetWeekMatchups(t *testing.T) {
+	baseURL := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/league/abc/matchups/8":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"roster_id": 1, "matchup_id": 1, "players": []string{"111", "222"}, "starters": []string{"111"}, "points": 95.5, "custom_points": nil},
+				{"roster_id": 2, "matchup_id": 1, "players": []string{"333"}, "starters": []string{"333"}, "points": 88.0, "custom_points": nil},
+			})
+		case "/league/abc/rosters":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"roster_id": 1, "owner_id": "u1", "players": []string{"111", "222"}, "starters": []string{"111"}},
+				{"roster_id": 2, "owner_id": "u2", "players": []string{"333"}, "starters": []string{"333"}},
+			})
+		case "/league/abc/users":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"user_id": "u1", "metadata": map[string]string{"team_name": "Team One"}},
+				{"user_id": "u2", "metadata": map[string]string{"team_name": "Team Two"}},
+			})
+		}
+	}))
+
+	resp, err := http.Get(baseURL + "/api/league/abc/week/8")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var matchups []provider.WeekMatchup
+	if err := json.NewDecoder(resp.Body).Decode(&matchups); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if len(matchups) != 2 {
+		t.Fatalf("expected 2 matchups, got %d", len(matchups))
+	}
+	if matchups[0].TeamName != "Team One" {
+		t.Errorf("expected team name %q, got %q", "Team One", matchups[0].TeamName)
+	}
+	if len(matchups[0].Players) != 2 {
+		t.Errorf("expected 2 players on roster 1, got %d", len(matchups[0].Players))
+	}
+	if matchups[0].Players[0].PlayerID != "111" {
+		t.Errorf("expected player 111, got %s", matchups[0].Players[0].PlayerID)
+	}
+	if matchups[0].Points != 95.5 {
+		t.Errorf("expected points 95.5, got %f", matchups[0].Points)
+	}
+	if matchups[0].CustomPoints != nil {
+		t.Errorf("expected custom_points nil, got %v", matchups[0].CustomPoints)
+	}
+}
+
+func TestGetWeekMatchups_InvalidWeek(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	resp, err := http.Get(baseURL + "/api/league/abc/week/notanumber")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestGetWeekMatchups_ZeroWeek(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	resp, err := http.Get(baseURL + "/api/league/abc/week/0")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
 func noopHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 }
