@@ -17,7 +17,11 @@ type playerSyncer interface {
 	UpsertPlayers(ctx context.Context, players []provider.Player) error
 }
 
-func HandleSyncPlayers(store playerSyncer, sleeperBaseURL, rankingsCSVURL string) http.Handler {
+type rosterInvalidator interface {
+	InvalidateRosters()
+}
+
+func HandleSyncPlayers(store playerSyncer, invalidator rosterInvalidator, sleeperBaseURL, rankingsCSVURL string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var (
 			wg          sync.WaitGroup
@@ -55,6 +59,7 @@ func HandleSyncPlayers(store playerSyncer, sleeperBaseURL, rankingsCSVURL string
 			http.Error(w, "failed to upsert players", http.StatusInternalServerError)
 			return
 		}
+		invalidator.InvalidateRosters()
 
 		encode(w, r, http.StatusOK, map[string]int{"upserted": len(players)})
 	})

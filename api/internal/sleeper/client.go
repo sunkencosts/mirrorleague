@@ -58,6 +58,12 @@ func New(baseURL string, players playerLookup) *Client {
 	}
 }
 
+func (c *Client) InvalidateRosters() {
+	c.rosterMu.Lock()
+	clear(c.rosterCache)
+	c.rosterMu.Unlock()
+}
+
 func (c *Client) resolvePlayers(playerMap map[string]provider.Player, ids []string) []provider.Player {
 	players := []provider.Player{}
 	for _, id := range ids {

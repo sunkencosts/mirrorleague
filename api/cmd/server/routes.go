@@ -13,8 +13,13 @@ import (
 	"github.com/sunkencosts/mirror-me/pkg/config"
 )
 
+type sleeperDeps interface {
+	provider.Provider
+	InvalidateRosters()
+}
+
 // Update api/api.md when adding or removing routes here.
-func addRoutes(mux *http.ServeMux, sleeperClient provider.Provider, store *db.Store, cfg config.Config) {
+func addRoutes(mux *http.ServeMux, sleeperClient sleeperDeps, store *db.Store, cfg config.Config) {
 	mux.Handle("POST /api/league-bookmarks", handlers.HandleSaveUserLeague(store))
 	mux.Handle("GET /api/league-bookmarks", handlers.HandleListUserLeagues(store))
 	mux.Handle("PATCH /api/league-bookmarks/{leagueId}", handlers.HandleUpdateUserLeague(store))
@@ -25,7 +30,7 @@ func addRoutes(mux *http.ServeMux, sleeperClient provider.Provider, store *db.St
 	mux.Handle("GET /api/lineups/{id}", handlers.HandleGetLineupByID(store))
 	mux.Handle("GET /api/league/{leagueId}/rosters", handlers.HandleGetRosters(sleeperClient))
 	mux.Handle("GET /api/league/{leagueId}", handlers.HandleGetLeague(sleeperClient))
-	mux.Handle("POST /api/admin/sync-players", handlers.HandleSyncPlayers(store, cfg.SleeperBaseURL, cfg.RankingsCSVURL))
+	mux.Handle("POST /api/admin/sync-players", handlers.HandleSyncPlayers(store, sleeperClient, cfg.SleeperBaseURL, cfg.RankingsCSVURL))
 	mux.HandleFunc("GET /healthz", handleHealthz(store))
 	mux.Handle("/", spaHandler("web/dist"))
 }

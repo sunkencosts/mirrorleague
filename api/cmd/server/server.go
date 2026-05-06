@@ -18,7 +18,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sunkencosts/mirror-me/internal/db"
-	"github.com/sunkencosts/mirror-me/internal/provider"
 	"github.com/sunkencosts/mirror-me/internal/sleeper"
 	"github.com/sunkencosts/mirror-me/pkg/config"
 )
@@ -83,7 +82,7 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	return nil
 }
 
-func NewServer(sleeperClient provider.Provider, cfg config.Config, store *db.Store) http.Handler {
+func NewServer(sleeperClient sleeperDeps, cfg config.Config, store *db.Store) http.Handler {
 	mux := http.NewServeMux()
 	addRoutes(mux, sleeperClient, store, cfg)
 
