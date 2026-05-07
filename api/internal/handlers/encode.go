@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 )
 
 func decode[T any](r *http.Request) (T, error) {
@@ -21,4 +22,13 @@ func encode[T any](w http.ResponseWriter, r *http.Request, status int, v T) erro
 		return fmt.Errorf("encode json: %w", err)
 	}
 	return nil
+}
+
+func parsePositiveInt(s string) (int, bool) {
+	n, err := strconv.Atoi(s)
+	return n, err == nil && n >= 1
+}
+
+func parseWeek(s string) (int, bool) {
+	return parsePositiveInt(s)
 }

@@ -30,9 +30,15 @@ interface StarterRowProps {
 	onTogglePicker: () => void;
 	onPickOverride: (player: Player) => void;
 	onClearOverride: () => void;
+	officialPoints?: number;
+	overridePoints?: number;
 }
 
-function OverrideChip({ player, onClear }: { player: Player; onClear: () => void }) {
+function OverrideChip({
+	player,
+	onClear,
+	points,
+}: { player: Player; onClear: () => void; points?: number }) {
 	return (
 		<button
 			type="button"
@@ -53,6 +59,11 @@ function OverrideChip({ player, onClear }: { player: Player; onClear: () => void
 				<span className={styles.pickMeta}>
 					{player.fantasy_positions[0]} · {player.team}
 				</span>
+				{typeof points === "number" && (
+					<span className={`${styles.playerPoints} ${styles.playerPointsRight}`}>
+						{points.toFixed(1)} pts
+					</span>
+				)}
 			</div>
 		</button>
 	);
@@ -67,6 +78,8 @@ function StarterRow({
 	onTogglePicker,
 	onPickOverride,
 	onClearOverride,
+	officialPoints,
+	overridePoints,
 }: StarterRowProps) {
 	const isOverridden = overridePlayer !== null;
 
@@ -95,6 +108,9 @@ function StarterRow({
 							<span className={styles.playerMeta}>
 								{officialPlayer.fantasy_positions[0]} · {officialPlayer.team}
 							</span>
+							{typeof officialPoints === "number" && (
+								<span className={styles.playerPoints}>{officialPoints.toFixed(1)} pts</span>
+							)}
 						</div>
 					</>
 				) : (
@@ -116,7 +132,7 @@ function StarterRow({
 			{/* RIGHT: override chip or CTA */}
 			<div className={styles.pickCell}>
 				{overridePlayer !== null ? (
-					<OverrideChip player={overridePlayer} onClear={onClearOverride} />
+					<OverrideChip player={overridePlayer} onClear={onClearOverride} points={overridePoints} />
 				) : (
 					<div className={styles.overrideCta}>
 						<button type="button" className={styles.overrideBtn} onClick={onTogglePicker}>
@@ -180,6 +196,24 @@ export default function RosterCard({
 		[lineups, roster.roster_id],
 	);
 
+	const playerPoints = useMemo(
+		() => weekMatchup?.player_points ?? {},
+		[weekMatchup],
+	);
+	const weekHasScoring = (weekMatchup?.points ?? 0) > 0;
+
+	const userTotal = useMemo(() => {
+		if (!existingLineup || !weekHasScoring) return null;
+		return existingLineup.starters.reduce((sum, id) => sum + (playerPoints[id] ?? 0), 0);
+	}, [existingLineup, playerPoints, weekHasScoring]);
+
+	const winner = useMemo((): "user" | "official" | "tie" | null => {
+		if (userTotal === null || !weekMatchup) return null;
+		if (userTotal > weekMatchup.points) return "user";
+		if (weekMatchup.points > userTotal) return "official";
+		return "tie";
+	}, [userTotal, weekMatchup]);
+
 	const { overrides, applyOverride, saveStatus } = useLineup({
 		userId,
 		leagueId,
@@ -229,9 +263,21 @@ export default function RosterCard({
 		<div className={styles.rosterCard}>
 			<div className={styles.teamHeader}>
 				<h2>{roster.team_name || `Team ${roster.roster_id}`}</h2>
-				{weekMatchup && (
-					<span>{(weekMatchup.custom_points ?? weekMatchup.points).toFixed(2)} pts</span>
-				)}
+				<div className={styles.headerScores}>
+					{weekMatchup && (
+						<span className={styles.officialScore}>
+							Official: {(weekMatchup.custom_points ?? weekMatchup.points).toFixed(2)}
+						</span>
+					)}
+					{userTotal !== null && (
+						<span className={styles.userScore}>You: {userTotal.toFixed(2)}</span>
+					)}
+					{winner && (
+						<span className={`${styles.winnerBadge} ${styles[winner]}`}>
+							{winner === "user" ? "You Win" : winner === "official" ? "You Lose" : "Tie"}
+						</span>
+					)}
+				</div>
 			</div>
 
 			<RosterRarity players={activePlayers} starters={activeStarters} allScores={allScores} />
@@ -244,19 +290,25 @@ export default function RosterCard({
 				</div>
 
 				<div className={styles.starterGrid}>
-					{starterSlots.map((slot, i) => (
-						<StarterRow
-							key={slotKeys[i]}
-							slot={slot}
-							officialPlayer={activeStarters[i] ?? null}
-							overridePlayer={overrides[i] ?? null}
-							isPickerOpen={selectedIndex === i}
-							eligiblePicks={eligiblePicksBySlot[i]}
-							onTogglePicker={() => handleTogglePicker(i)}
-							onPickOverride={(player) => handlePickOverride(i, player)}
-							onClearOverride={() => handleClearOverride(i)}
-						/>
-					))}
+					{starterSlots.map((slot, i) => {
+						const official = activeStarters[i] ?? null;
+						const overridePlayer = overrides[i] ?? null;
+						return (
+							<StarterRow
+								key={slotKeys[i]}
+								slot={slot}
+								officialPlayer={official}
+								overridePlayer={overridePlayer}
+								isPickerOpen={selectedIndex === i}
+								eligiblePicks={eligiblePicksBySlot[i]}
+								onTogglePicker={() => handleTogglePicker(i)}
+								onPickOverride={(player) => handlePickOverride(i, player)}
+								onClearOverride={() => handleClearOverride(i)}
+								officialPoints={weekHasScoring && official ? (playerPoints[official.player_id] ?? 0) : undefined}
+								overridePoints={weekHasScoring && overridePlayer ? (playerPoints[overridePlayer.player_id] ?? 0) : undefined}
+							/>
+						);
+					})}
 				</div>
 			</div>
 

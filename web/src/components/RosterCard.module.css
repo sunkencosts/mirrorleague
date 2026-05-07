@@ -21,6 +21,67 @@
 	font-weight: 600;
 }
 
+/* ── Header scores + win/loss ── */
+
+.headerScores {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+
+.officialScore {
+	font-size: 0.8rem;
+	color: var(--text-dim);
+}
+
+.userScore {
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--accent);
+}
+
+.winnerBadge {
+	font-size: 0.7rem;
+	font-weight: 700;
+	padding: 0.2rem 0.55rem;
+	border-radius: 9999px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.winnerBadge.user {
+	background: color-mix(in srgb, #22c55e 18%, transparent);
+	color: #4ade80;
+	border: 1px solid #22c55e55;
+}
+
+.winnerBadge.official {
+	background: color-mix(in srgb, #ef4444 18%, transparent);
+	color: #f87171;
+	border: 1px solid #ef444455;
+}
+
+.winnerBadge.tie {
+	background: color-mix(in srgb, var(--text-dim) 12%, transparent);
+	color: var(--text-dim);
+	border: 1px solid var(--border-ui);
+}
+
+/* ── Per-player points ── */
+
+.playerPoints {
+	font-size: 0.65rem;
+	font-weight: 600;
+	color: var(--text-dim);
+	line-height: 1.2;
+}
+
+.playerPointsRight {
+	text-align: right;
+}
+
 /* ── Sections ── */
 
 .section + .section {

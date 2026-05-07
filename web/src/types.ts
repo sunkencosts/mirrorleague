@@ -62,6 +62,7 @@ export interface WeekMatchup {
 	custom_points: number | null;
 	players: Player[];
 	starters: Player[];
+	player_points: Record<string, number>;
 }
 
 export interface LeagueBookmark {

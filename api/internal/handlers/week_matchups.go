@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
@@ -15,9 +14,8 @@ type weekMatchupProvider interface {
 func HandleGetWeekMatchups(p weekMatchupProvider) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		leagueID := r.PathValue("leagueId")
-		weekStr := r.PathValue("week")
-		week, err := strconv.Atoi(weekStr)
-		if err != nil || week < 1 {
+		week, ok := parseWeek(r.PathValue("week"))
+		if !ok {
 			http.Error(w, "invalid week", http.StatusBadRequest)
 			return
 		}

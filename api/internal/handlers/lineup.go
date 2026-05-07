@@ -19,8 +19,8 @@ type lineupStore interface {
 	ListLineups(ctx context.Context, userID, leagueID string, weekNumber int, rosterID *int) ([]provider.Lineup, error)
 }
 
-type lineupRosterProvider interface {
-	GetRosters(ctx context.Context, leagueID string) ([]provider.Roster, error)
+type lineupMatchupProvider interface {
+	GetWeekMatchups(ctx context.Context, leagueID string, week int) ([]provider.WeekMatchup, error)
 }
 
 type createLineupRequest struct {
@@ -37,7 +37,7 @@ type updateLineupRequest struct {
 	Starters []string `json:"starters"`
 }
 
-func HandleCreateLineup(store lineupStore, p lineupRosterProvider) http.Handler {
+func HandleCreateLineup(store lineupStore, p lineupMatchupProvider) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req, err := decode[createLineupRequest](r)
 		if err != nil {
@@ -50,7 +50,7 @@ func HandleCreateLineup(store lineupStore, p lineupRosterProvider) http.Handler 
 			return
 		}
 
-		if err := validateStarters(r.Context(), p, req.LeagueID, req.RosterID, req.Starters); err != nil {
+		if err := validateStarters(r.Context(), p, req.LeagueID, req.RosterID, req.WeekNumber, req.Starters); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -65,7 +65,7 @@ func HandleCreateLineup(store lineupStore, p lineupRosterProvider) http.Handler 
 	})
 }
 
-func HandleUpdateLineup(store lineupStore, p lineupRosterProvider) http.Handler {
+func HandleUpdateLineup(store lineupStore, p lineupMatchupProvider) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if _, err := uuid.Parse(id); err != nil {
@@ -93,7 +93,7 @@ func HandleUpdateLineup(store lineupStore, p lineupRosterProvider) http.Handler 
 			return
 		}
 
-		if err := validateStarters(r.Context(), p, existing.LeagueID, existing.RosterID, req.Starters); err != nil {
+		if err := validateStarters(r.Context(), p, existing.LeagueID, existing.RosterID, existing.WeekNumber, req.Starters); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -162,30 +162,28 @@ func HandleGetLineupByID(store lineupStore) http.Handler {
 		encode(w, r, http.StatusOK, lineup)
 	})
 }
-func validateStarters(ctx context.Context, p lineupRosterProvider, leagueID string, rosterID int, starters []string) error {
-	rosters, err := p.GetRosters(ctx, leagueID)
+func validateStarters(ctx context.Context, p lineupMatchupProvider, leagueID string, rosterID, week int, starters []string) error {
+	matchups, err := p.GetWeekMatchups(ctx, leagueID, week)
 	if err != nil {
-		return fmt.Errorf("fetching roster: %w", err)
+		return fmt.Errorf("fetching matchups: %w", err)
 	}
 
-	var roster *provider.Roster
-	for i := range rosters {
-		if rosters[i].RosterID == rosterID {
-			roster = &rosters[i]
-			break
-		}
+	if len(matchups) == 0 {
+		// No matchup data published for this week yet — skip validation.
+		return nil
 	}
-	if roster == nil {
-		return fmt.Errorf("roster %d not found in league", rosterID)
+	matchup := findMatchup(matchups, rosterID)
+	if matchup == nil {
+		return fmt.Errorf("roster %d not found in league for week %d", rosterID, week)
 	}
 
-	playerSet := make(map[string]struct{}, len(roster.Players))
-	for _, p := range roster.Players {
+	playerSet := make(map[string]struct{}, len(matchup.Players))
+	for _, p := range matchup.Players {
 		playerSet[p.PlayerID] = struct{}{}
 	}
 	for _, id := range starters {
 		if _, ok := playerSet[id]; !ok {
-			return fmt.Errorf("player %s is not on this roster", id)
+			return fmt.Errorf("player %s was not available for week %d", id, week)
 		}
 	}
 	return nil

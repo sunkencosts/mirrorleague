@@ -192,6 +192,25 @@ type WeekMatchup struct {
 	PlayerPoints map[string]float64  `json:"player_points"`
 }
 
+type ScoredPlayer struct {
+	Player
+	Points float64 `json:"points"`
+}
+
+type ScoredLineup struct {
+	LineupID    string         `json:"lineup_id,omitempty"`
+	Starters    []ScoredPlayer `json:"starters"`
+	TotalPoints float64        `json:"total_points"`
+}
+
+type CompareResponse struct {
+	RosterID int          `json:"roster_id"`
+	Week     int          `json:"week"`
+	Official ScoredLineup `json:"official"`
+	User     ScoredLineup `json:"user"`
+	Winner   string       `json:"winner"`
+}
+
 type Lineup struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`

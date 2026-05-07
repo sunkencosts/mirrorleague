@@ -265,6 +265,10 @@ func TestSyncPlayers(t *testing.T) {
 func lineupSleeperHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/league/test-league/matchups/1":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"roster_id": 1, "matchup_id": 1, "players": []string{"111", "222", "333"}, "starters": []string{"111"}, "points": 0.0},
+			})
 		case "/league/test-league/rosters":
 			json.NewEncoder(w).Encode([]map[string]any{
 				{"roster_id": 1, "owner_id": "owner1", "players": []string{"111", "222", "333"}, "starters": []string{"111"}},
@@ -598,6 +602,132 @@ func TestGetWeekMatchups_ZeroWeek(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
 	resp, err := http.Get(baseURL + "/api/league/abc/week/0")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func compareSleeperHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/league/abc/matchups/8":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{
+					"roster_id": 1, "matchup_id": 5,
+					"players":  []string{"111", "222", "333"},
+					"starters": []string{"111", "222"},
+					"points":   30.5,
+					"players_points": map[string]float64{"111": 22.4, "222": 8.1, "333": 15.0},
+				},
+			})
+		case "/league/abc/rosters":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"roster_id": 1, "owner_id": "owner1", "players": []string{"111", "222", "333"}, "starters": []string{"111", "222"}},
+			})
+		case "/league/abc/users":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"user_id": "owner1", "metadata": map[string]string{"team_name": "Test Team"}},
+			})
+		}
+	})
+}
+
+func createLineupForCompare(t *testing.T, baseURL, userID string) provider.Lineup {
+	t.Helper()
+	body := fmt.Sprintf(`{"user_id":%q,"source":"sleeper","league_id":"abc","roster_id":1,"week_number":8,"starters":["111","333"]}`, userID)
+	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("createLineupForCompare: request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("createLineupForCompare: expected 201, got %d", resp.StatusCode)
+	}
+	var lineup provider.Lineup
+	if err := json.NewDecoder(resp.Body).Decode(&lineup); err != nil {
+		t.Fatalf("createLineupForCompare: failed to decode: %v", err)
+	}
+	return lineup
+}
+
+func TestCompareLineup(t *testing.T) {
+	const userID = "00000000-0000-0000-0000-000000000002"
+	baseURL := newTestServer(t, compareSleeperHandler())
+	createLineupForCompare(t, baseURL, userID)
+
+	resp, err := http.Get(baseURL + "/api/league/abc/week/8/roster/1/compare?user_id=" + userID)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var result provider.CompareResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result.Official.TotalPoints != 30.5 {
+		t.Errorf("expected official total_points 30.5, got %f", result.Official.TotalPoints)
+	}
+	if result.User.TotalPoints != 37.4 {
+		t.Errorf("expected user total_points 37.4 (22.4+15.0), got %f", result.User.TotalPoints)
+	}
+	if result.Winner != "user" {
+		t.Errorf("expected winner %q, got %q", "user", result.Winner)
+	}
+	if result.User.LineupID == "" {
+		t.Errorf("expected user lineup_id to be set")
+	}
+	if result.Official.LineupID != "" {
+		t.Errorf("expected official lineup_id to be empty, got %q", result.Official.LineupID)
+	}
+	if len(result.User.Starters) != 2 {
+		t.Errorf("expected 2 user starters, got %d", len(result.User.Starters))
+	}
+	if len(result.Official.Starters) != 2 {
+		t.Errorf("expected 2 official starters, got %d", len(result.Official.Starters))
+	}
+}
+
+func TestCompareLineup_NoLineup(t *testing.T) {
+	baseURL := newTestServer(t, compareSleeperHandler())
+
+	resp, err := http.Get(baseURL + "/api/league/abc/week/8/roster/1/compare?user_id=nobody")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestCompareLineup_InvalidWeek(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	resp, err := http.Get(baseURL + "/api/league/abc/week/notanumber/roster/1/compare?user_id=x")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestCompareLineup_MissingUserID(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	resp, err := http.Get(baseURL + "/api/league/abc/week/8/roster/1/compare")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
