@@ -187,8 +187,9 @@ type WeekMatchup struct {
 	TeamName     string   `json:"team_name"`
 	Points       float64  `json:"points"`
 	CustomPoints *float64 `json:"custom_points"`
-	Players      []Player `json:"players"`
-	Starters     []Player `json:"starters"`
+	Players      []Player            `json:"players"`
+	Starters     []Player            `json:"starters"`
+	PlayerPoints map[string]float64  `json:"player_points"`
 }
 
 type Lineup struct {

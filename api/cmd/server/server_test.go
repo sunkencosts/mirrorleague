@@ -522,7 +522,7 @@ func TestGetWeekMatchups(t *testing.T) {
 		switch r.URL.Path {
 		case "/league/abc/matchups/8":
 			json.NewEncoder(w).Encode([]map[string]any{
-				{"roster_id": 1, "matchup_id": 1, "players": []string{"111", "222"}, "starters": []string{"111"}, "points": 95.5, "custom_points": nil},
+				{"roster_id": 1, "matchup_id": 1, "players": []string{"111", "222"}, "starters": []string{"111"}, "points": 95.5, "custom_points": nil, "players_points": map[string]float64{"111": 22.4, "222": 8.1}},
 				{"roster_id": 2, "matchup_id": 1, "players": []string{"333"}, "starters": []string{"333"}, "points": 88.0, "custom_points": nil},
 			})
 		case "/league/abc/rosters":
@@ -568,6 +568,15 @@ func TestGetWeekMatchups(t *testing.T) {
 	}
 	if matchups[0].CustomPoints != nil {
 		t.Errorf("expected custom_points nil, got %v", matchups[0].CustomPoints)
+	}
+	if matchups[0].PlayerPoints["111"] != 22.4 {
+		t.Errorf("expected player 111 points 22.4, got %f", matchups[0].PlayerPoints["111"])
+	}
+	if matchups[0].PlayerPoints["222"] != 8.1 {
+		t.Errorf("expected player 222 points 8.1, got %f", matchups[0].PlayerPoints["222"])
+	}
+	if matchups[1].PlayerPoints != nil {
+		t.Errorf("expected nil PlayerPoints for roster 2, got %v", matchups[1].PlayerPoints)
 	}
 }
 

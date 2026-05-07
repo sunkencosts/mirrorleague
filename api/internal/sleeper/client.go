@@ -47,12 +47,13 @@ type matchupCacheEntry struct {
 }
 
 type matchupEntry struct {
-	RosterID     int      `json:"roster_id"`
-	MatchupID    int      `json:"matchup_id"`
-	Players      []string `json:"players"`
-	Starters     []string `json:"starters"`
-	Points       float64  `json:"points"`
-	CustomPoints *float64 `json:"custom_points"`
+	RosterID      int                `json:"roster_id"`
+	MatchupID     int                `json:"matchup_id"`
+	Players       []string           `json:"players"`
+	Starters      []string           `json:"starters"`
+	Points        float64            `json:"points"`
+	CustomPoints  *float64           `json:"custom_points"`
+	PlayersPoints map[string]float64 `json:"players_points"`
 }
 
 type Client struct {
@@ -338,6 +339,7 @@ func (c *Client) fetchWeekMatchups(ctx context.Context, leagueID string, week in
 			CustomPoints: m.CustomPoints,
 			Players:      c.resolvePlayers(playerMap, m.Players),
 			Starters:     c.resolvePlayers(playerMap, m.Starters),
+			PlayerPoints: m.PlayersPoints,
 		})
 	}
 
