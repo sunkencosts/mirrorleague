@@ -9,9 +9,8 @@
 
 .teamHeader {
 	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 1rem;
+	flex-direction: column;
+	gap: 0.5rem;
 	margin-bottom: 1.25rem;
 }
 
@@ -28,7 +27,6 @@
 	align-items: center;
 	gap: 0.5rem;
 	flex-wrap: wrap;
-	justify-content: flex-end;
 }
 
 .officialScore {
@@ -67,19 +65,6 @@
 	background: color-mix(in srgb, var(--text-dim) 12%, transparent);
 	color: var(--text-dim);
 	border: 1px solid var(--border-ui);
-}
-
-/* ── Per-player points ── */
-
-.playerPoints {
-	font-size: 0.65rem;
-	font-weight: 600;
-	color: var(--text-dim);
-	line-height: 1.2;
-}
-
-.playerPointsRight {
-	text-align: right;
 }
 
 /* ── Sections ── */
@@ -150,45 +135,6 @@
 	transition: opacity 0.2s ease;
 }
 
-.officialCell img {
-	width: 32px;
-	height: 32px;
-	border-radius: 50%;
-	object-fit: cover;
-	flex-shrink: 0;
-}
-
-.officialDimmed {
-	opacity: 0.7;
-}
-
-.playerInfo {
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
-}
-
-.playerName {
-	font-size: 0.8rem;
-	font-weight: 500;
-	color: var(--text);
-	line-height: 1.3;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.playerNameStruck {
-	text-decoration: line-through;
-	color: var(--text-dim);
-}
-
-.playerMeta {
-	font-size: 0.68rem;
-	color: var(--text-muted);
-	line-height: 1.2;
-}
-
 /* ── Center cell: slot pill ── */
 
 .slotCell {
@@ -242,24 +188,7 @@
 	min-width: 0;
 }
 
-.overrideChip {
-	display: flex;
-	flex-direction: row-reverse;
-	align-items: center;
-	gap: 0.5rem;
-	min-width: 0;
-	max-width: 100%;
-}
-
-.overrideChip img {
-	width: 32px;
-	height: 32px;
-	border-radius: 50%;
-	object-fit: cover;
-	flex-shrink: 0;
-}
-
-/* Button-specific reset and hover */
+/* Override chip — PlayerCard wrapped in a button */
 .overrideChipBtn {
 	background: none;
 	border: none;
@@ -270,31 +199,6 @@
 
 .overrideChipBtn:hover {
 	opacity: 0.7;
-}
-
-.pickInfo {
-	display: flex;
-	flex-direction: column;
-	flex: 1;
-	min-width: 0;
-}
-
-.pickName {
-	font-size: 0.8rem;
-	font-weight: 600;
-	color: var(--text);
-	line-height: 1.3;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	text-align: right;
-}
-
-.pickMeta {
-	font-size: 0.68rem;
-	color: var(--accent-hover);
-	line-height: 1.2;
-	text-align: right;
 }
 
 /* "+ Override" CTA (when slot is unchanged) */
@@ -334,49 +238,6 @@
 	border-radius: 8px;
 	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 	overflow: hidden;
-}
-
-.pickerItem {
-	display: flex;
-	align-items: center;
-	gap: 0.6rem;
-	width: 100%;
-	padding: 0.5rem 0.75rem;
-	background: none;
-	border: none;
-	border-bottom: 1px solid var(--border);
-	color: var(--text);
-	cursor: pointer;
-	text-align: left;
-	transition: background 0.1s;
-}
-
-.pickerItem:last-child {
-	border-bottom: none;
-}
-
-.pickerItem:hover {
-	background: var(--bg-hover);
-}
-
-.pickerItem img {
-	width: 32px;
-	height: 32px;
-	border-radius: 50%;
-	object-fit: cover;
-	background: var(--border);
-	flex-shrink: 0;
-}
-
-.pickerName {
-	font-size: 0.8rem;
-	font-weight: 500;
-	flex: 1;
-}
-
-.pickerMeta {
-	font-size: 0.7rem;
-	color: var(--text-dim);
 }
 
 .pickerEmpty {
@@ -423,16 +284,6 @@
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
-}
-
-.statusSaved {
-	font-size: 0.75rem;
-	color: var(--accent);
-}
-
-.statusError {
-	font-size: 0.75rem;
-	color: var(--color-error);
 }
 
 /* ── Backdrop (closes open pickers) ── */
