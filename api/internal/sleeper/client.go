@@ -12,10 +12,12 @@ import (
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
 
+const IconURL = "https://sleepercdn.com/images/sleeperbot_icon_sm.png"
+
 const (
-	rosterCacheTTL           = 5 * time.Minute
+	rosterCacheTTL            = 5 * time.Minute
 	matchupCacheTTLHistorical = 24 * time.Hour
-	matchupCacheTTLCurrent   = 2 * time.Minute
+	matchupCacheTTLCurrent    = 2 * time.Minute
 )
 
 type roster struct {

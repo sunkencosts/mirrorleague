@@ -181,15 +181,15 @@ type Roster struct {
 	Taxi     []Player `json:"taxi"`
 }
 type WeekMatchup struct {
-	RosterID     int      `json:"roster_id"`
-	MatchupID    int      `json:"matchup_id"`
-	OwnerID      string   `json:"owner_id"`
-	TeamName     string   `json:"team_name"`
-	Points       float64  `json:"points"`
-	CustomPoints *float64 `json:"custom_points"`
-	Players      []Player            `json:"players"`
-	Starters     []Player            `json:"starters"`
-	PlayerPoints map[string]float64  `json:"player_points"`
+	RosterID     int                `json:"roster_id"`
+	MatchupID    int                `json:"matchup_id"`
+	OwnerID      string             `json:"owner_id"`
+	TeamName     string             `json:"team_name"`
+	Points       float64            `json:"points"`
+	CustomPoints *float64           `json:"custom_points"`
+	Players      []Player           `json:"players"`
+	Starters     []Player           `json:"starters"`
+	PlayerPoints map[string]float64 `json:"player_points"`
 }
 
 type ScoredPlayer struct {
@@ -212,21 +212,23 @@ type CompareResponse struct {
 }
 
 type Lineup struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
-	LeagueID  string    `json:"league_id"`
-	RosterID  int       `json:"roster_id"`
-	WeekNumber int      `json:"week_number"`
-	Source    string    `json:"source"`
-	Starters  []string  `json:"starters"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         string    `json:"id"`
+	UserID     string    `json:"user_id"`
+	LeagueID   string    `json:"league_id"`
+	RosterID   int       `json:"roster_id"`
+	WeekNumber int       `json:"week_number"`
+	Source     string    `json:"source"`
+	Starters   []string  `json:"starters"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 type UserLeague struct {
 	UserID    string    `json:"user_id"`
 	LeagueID  string    `json:"league_id"`
 	Label     string    `json:"label"`
 	CreatedAt time.Time `json:"created_at"`
+	IconURL   string    `json:"icon_url"`
+	Source    string    `json:"source"`
 }
 
 type Provider interface {

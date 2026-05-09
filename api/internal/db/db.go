@@ -156,17 +156,17 @@ func (s *Store) UpdateLineup(ctx context.Context, id string, starters []string) 
 
 func scanUserLeague(row scanner) (provider.UserLeague, error) {
 	var ul provider.UserLeague
-	err := row.Scan(&ul.UserID, &ul.LeagueID, &ul.Label, &ul.CreatedAt)
+	err := row.Scan(&ul.UserID, &ul.LeagueID, &ul.Label, &ul.Source, &ul.CreatedAt)
 	return ul, err
 }
 
-func (s *Store) SaveUserLeague(ctx context.Context, userID, leagueID, label string) (provider.UserLeague, error) {
+func (s *Store) SaveUserLeague(ctx context.Context, userID, leagueID, source, label string) (provider.UserLeague, error) {
 	row := s.pool.QueryRow(ctx, `
-		INSERT INTO league_bookmarks (user_id, league_id, label)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (user_id, league_id) DO UPDATE SET label = EXCLUDED.label
-		RETURNING user_id, league_id, label, created_at
-	`, userID, leagueID, label)
+		INSERT INTO league_bookmarks (user_id, league_id, source, label)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (user_id, league_id, source) DO UPDATE SET label = EXCLUDED.label
+		RETURNING user_id, league_id, label, source, created_at
+	`, userID, leagueID, source, label)
 	ul, err := scanUserLeague(row)
 	if err != nil {
 		return provider.UserLeague{}, fmt.Errorf("saving user league: %w", err)
@@ -176,7 +176,7 @@ func (s *Store) SaveUserLeague(ctx context.Context, userID, leagueID, label stri
 
 func (s *Store) ListUserLeagues(ctx context.Context, userID string) ([]provider.UserLeague, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT user_id, league_id, label, created_at
+		SELECT user_id, league_id, label, source, created_at
 		FROM league_bookmarks
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -200,13 +200,13 @@ func (s *Store) ListUserLeagues(ctx context.Context, userID string) ([]provider.
 	return leagues, nil
 }
 
-func (s *Store) UpdateUserLeague(ctx context.Context, userID, leagueID, label string) (provider.UserLeague, error) {
+func (s *Store) UpdateUserLeague(ctx context.Context, userID, leagueID, source, label string) (provider.UserLeague, error) {
 	row := s.pool.QueryRow(ctx, `
 		UPDATE league_bookmarks
-		SET label = $3
-		WHERE user_id = $1 AND league_id = $2
-		RETURNING user_id, league_id, label, created_at
-	`, userID, leagueID, label)
+		SET label = $4
+		WHERE user_id = $1 AND league_id = $2 AND source = $3
+		RETURNING user_id, league_id, label, source, created_at
+	`, userID, leagueID, source, label)
 	ul, err := scanUserLeague(row)
 	if err != nil {
 		return provider.UserLeague{}, fmt.Errorf("updating user league: %w", err)
@@ -214,8 +214,8 @@ func (s *Store) UpdateUserLeague(ctx context.Context, userID, leagueID, label st
 	return ul, nil
 }
 
-func (s *Store) DeleteUserLeague(ctx context.Context, userID, leagueID string) error {
-	tag, err := s.pool.Exec(ctx, `DELETE FROM league_bookmarks WHERE user_id = $1 AND league_id = $2`, userID, leagueID)
+func (s *Store) DeleteUserLeague(ctx context.Context, userID, leagueID, source string) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM league_bookmarks WHERE user_id = $1 AND league_id = $2 AND source = $3`, userID, leagueID, source)
 	if err != nil {
 		return fmt.Errorf("deleting user league: %w", err)
 	}

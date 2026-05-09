@@ -25,9 +25,11 @@ CREATE TABLE lineups(
 );
 
 CREATE TABLE league_bookmarks(
-    user_id     text NOT NULL,
-    league_id   text NOT NULL,
-    label       text NOT NULL DEFAULT '',
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (user_id, league_id)
+    user_id text NOT NULL,
+    league_id text NOT NULL,
+    source text NOT NULL,
+    label text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, league_id, source)
 );
+

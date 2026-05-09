@@ -742,9 +742,9 @@ func noopHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 }
 
-func saveTestUserLeague(t *testing.T, baseURL, userID, leagueID, label string) provider.UserLeague {
+func saveTestUserLeague(t *testing.T, baseURL, userID, leagueID, source, label string) provider.UserLeague {
 	t.Helper()
-	body := fmt.Sprintf(`{"user_id":%q,"league_id":%q,"label":%q}`, userID, leagueID, label)
+	body := fmt.Sprintf(`{"user_id":%q,"league_id":%q,"source":%q,"label":%q}`, userID, leagueID, source, label)
 	resp, err := http.Post(baseURL+"/api/league-bookmarks", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("saveTestUserLeague: request failed: %v", err)
@@ -763,7 +763,7 @@ func saveTestUserLeague(t *testing.T, baseURL, userID, leagueID, label string) p
 func TestSaveUserLeague(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	ul := saveTestUserLeague(t, baseURL, "user-a", "league-1", "My League")
+	ul := saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "My League")
 
 	if ul.UserID != "user-a" {
 		t.Errorf("expected user_id %q, got %q", "user-a", ul.UserID)
@@ -778,7 +778,7 @@ func TestSaveUserLeague(t *testing.T) {
 
 func TestListUserLeagues(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
-	saveTestUserLeague(t, baseURL, "user-a", "league-1", "My League")
+	saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "My League")
 
 	resp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-a")
 	if err != nil {
@@ -824,7 +824,7 @@ func TestListUserLeagues_Empty(t *testing.T) {
 
 func TestListUserLeagues_Isolation(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
-	saveTestUserLeague(t, baseURL, "user-a", "league-1", "User A League")
+	saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "User A League")
 
 	resp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-b")
 	if err != nil {
@@ -843,8 +843,8 @@ func TestListUserLeagues_Isolation(t *testing.T) {
 
 func TestSaveUserLeague_Upsert(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
-	saveTestUserLeague(t, baseURL, "user-a", "league-1", "First Label")
-	ul := saveTestUserLeague(t, baseURL, "user-a", "league-1", "Updated Label")
+	saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "First Label")
+	ul := saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "Updated Label")
 
 	if ul.Label != "Updated Label" {
 		t.Errorf("expected updated label, got %q", ul.Label)
@@ -870,10 +870,10 @@ func TestSaveUserLeague_Upsert(t *testing.T) {
 
 func TestUpdateUserLeague(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
-	saveTestUserLeague(t, baseURL, "user-a", "league-1", "Old Label")
+	saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "Old Label")
 
 	body := `{"user_id":"user-a","label":"New Label"}`
-	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/league-bookmarks/league-1", strings.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/league-bookmarks/league-1?source=sleeper", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -897,7 +897,7 @@ func TestUpdateUserLeague_NotFound(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
 	body := `{"user_id":"user-a","label":"Whatever"}`
-	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/league-bookmarks/nonexistent", strings.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/league-bookmarks/nonexistent?source=sleeper", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -912,9 +912,9 @@ func TestUpdateUserLeague_NotFound(t *testing.T) {
 
 func TestDeleteUserLeague(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
-	saveTestUserLeague(t, baseURL, "user-a", "league-1", "To Delete")
+	saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "To Delete")
 
-	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/api/league-bookmarks/league-1?user_id=user-a", nil)
+	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/api/league-bookmarks/league-1?user_id=user-a&source=sleeper", nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -943,7 +943,7 @@ func TestDeleteUserLeague(t *testing.T) {
 func TestDeleteUserLeague_NotFound(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/api/league-bookmarks/nonexistent?user_id=user-a", nil)
+	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/api/league-bookmarks/nonexistent?user_id=user-a&source=sleeper", nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)

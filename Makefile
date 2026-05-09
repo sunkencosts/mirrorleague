@@ -1,7 +1,7 @@
 -include api/.env
 export
 
-.PHONY: db db-stop db-reset migrate-up migrate-down migrate-version migrate-create test lint dev
+.PHONY: db db-stop db-reset migrate-up migrate-down migrate-version migrate-create seed-players dump-players test lint dev
 
 db:
 	docker compose up -d
@@ -12,8 +12,15 @@ db-stop:
 db-reset:
 	docker compose down -v
 	docker compose up -d
-	until docker compose exec db pg_isready -U postgres; do sleep 1; done
+	until docker compose exec db pg_isready -U mirrorme; do sleep 1; done
 	$(MAKE) migrate-up
+	$(MAKE) seed-players
+
+seed-players:
+	psql $(DATABASE_URL) -c "\COPY players FROM STDIN" < api/seeds/players.tsv
+
+dump-players:
+	psql $(DATABASE_URL) -c "\COPY players TO STDOUT" > api/seeds/players.tsv
 
 migrate-up:
 	cd api && go run ./cmd/migrate up
