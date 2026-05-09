@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { patchJson, postJson } from "../api";
 import type { Lineup, Player } from "../types";
 
 interface Params {
@@ -80,33 +81,18 @@ export function useLineup({
 	const mutation = useMutation({
 		mutationFn: (starters: string[]) => {
 			if (state.lineupId === null) {
-				return fetch("/api/lineups", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						user_id: userId,
-						league_id: leagueId,
-						source: "sleeper",
-						roster_id: rosterId,
-						week_number: weekNumber,
-						starters,
-					}),
-				}).then((r) => {
-					if (!r.ok) {
-						throw new Error(`${r.status}`);
-					}
-					return r.json();
+				return postJson<Lineup>("/api/lineups", {
+					user_id: userId,
+					league_id: leagueId,
+					source: "sleeper",
+					roster_id: rosterId,
+					week_number: weekNumber,
+					starters,
 				});
 			}
-			return fetch(`/api/lineups/${state.lineupId}`, {
-				method: "PATCH",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ user_id: userId, starters }),
-			}).then((r) => {
-				if (!r.ok) {
-					throw new Error(`${r.status}`);
-				}
-				return r.json();
+			return patchJson<Lineup>(`/api/lineups/${state.lineupId}`, {
+				user_id: userId,
+				starters,
 			});
 		},
 		onSuccess: (data) => {

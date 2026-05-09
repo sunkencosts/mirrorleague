@@ -70,4 +70,6 @@ export interface LeagueBookmark {
 	league_id: string;
 	label: string;
 	created_at: string;
+	source: string;
+	icon_url: string;
 }

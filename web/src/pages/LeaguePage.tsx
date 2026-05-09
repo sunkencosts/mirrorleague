@@ -62,8 +62,8 @@ export default function LeaguePage() {
 	});
 
 	const { mutate: patchLabel } = useMutation({
-		mutationFn: (label: string) =>
-			patchJson<LeagueBookmark>(`/api/league-bookmarks/${leagueId}`, {
+		mutationFn: ({ label, source }: { label: string; source: string }) =>
+			patchJson<LeagueBookmark>(`/api/league-bookmarks/${leagueId}?source=${source}`, {
 				user_id: userId,
 				label,
 			}),
@@ -80,7 +80,7 @@ export default function LeaguePage() {
 			return;
 		}
 		patched.current = true;
-		patchLabel(league.name);
+		patchLabel({ label: league.name, source: bookmark.source });
 	}, [league, bookmarks, leagueId, patchLabel]);
 
 	const leagueConfig = useMemo<LeagueConfig | null>(() => {

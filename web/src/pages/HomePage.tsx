@@ -20,6 +20,7 @@ export default function HomePage() {
 				user_id: userId,
 				league_id: leagueId.trim(),
 				label: label.trim(),
+				source: "sleeper",
 			}),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: bookmarksKey(userId) }),
 	});
