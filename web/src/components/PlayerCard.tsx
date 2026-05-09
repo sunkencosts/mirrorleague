@@ -31,6 +31,8 @@ function PlayerCard({ player, reversed, points, dimmed, compact }: Props) {
 				}}
 				src={player.image_url}
 				alt={`${player.first_name} ${player.last_name}`}
+				width={42}
+				height={40}
 				onError={onImageError}
 			/>
 			<div className={styles.playerInfo}>

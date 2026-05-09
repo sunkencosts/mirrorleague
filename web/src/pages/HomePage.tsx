@@ -8,7 +8,7 @@ import type { LeagueBookmark } from "../types";
 import styles from "./HomePage.module.css";
 
 export default function HomePage() {
-	const [leagueId, setLeagueId] = useState("1322995024962543616");
+	const [leagueId, setLeagueId] = useState("1182073403987832832");
 	const [label, setLabel] = useState("");
 	const navigate = useNavigate();
 	const userId = useUserId();

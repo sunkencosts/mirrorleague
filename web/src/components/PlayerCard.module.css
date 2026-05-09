@@ -36,6 +36,7 @@
 	font-weight: 600;
 	color: var(--text-dim);
 	line-height: 1.2;
+	font-variant-numeric: tabular-nums;
 }
 
 .nameStruck {

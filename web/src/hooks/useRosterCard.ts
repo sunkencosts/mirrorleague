@@ -35,19 +35,6 @@ export function useRosterCard({
 	const playerPoints = useMemo(() => weekMatchup?.player_points ?? {}, [weekMatchup]);
 	const weekHasScoring = (weekMatchup?.points ?? 0) > 0;
 
-	const userTotal = useMemo(() => {
-		if (!existingLineup || !weekHasScoring) return null;
-		return existingLineup.starters.reduce((sum, id) => sum + (playerPoints[id] ?? 0), 0);
-	}, [existingLineup, playerPoints, weekHasScoring]);
-
-	const winner = useMemo((): "user" | "official" | "tie" | null => {
-		if (userTotal === null || !weekMatchup) return null;
-		const officialPoints = weekMatchup.custom_points ?? weekMatchup.points;
-		if (userTotal > officialPoints) return "user";
-		if (officialPoints > userTotal) return "official";
-		return "tie";
-	}, [userTotal, weekMatchup]);
-
 	const { overrides, applyOverride, saveStatus } = useLineup({
 		userId,
 		leagueId,
@@ -58,6 +45,33 @@ export function useRosterCard({
 		slotCount: starterSlots.length,
 		existingLineup,
 	});
+
+	const hasOverrides = useMemo(() => Object.values(overrides).some(Boolean), [overrides]);
+
+	const officialPoints = useMemo(
+		() => (weekMatchup ? (weekMatchup.custom_points ?? weekMatchup.points) : null),
+		[weekMatchup],
+	);
+
+	const userTotal = useMemo(() => {
+		if (!weekHasScoring || !hasOverrides) return null;
+		return activeStarters.reduce((sum, player, i) => {
+			const effective = overrides[i] ?? player;
+			return sum + (effective ? (playerPoints[effective.player_id] ?? 0) : 0);
+		}, 0);
+	}, [weekHasScoring, hasOverrides, activeStarters, overrides, playerPoints]);
+
+	const winner = useMemo((): "user" | "official" | "tie" | null => {
+		if (userTotal === null || officialPoints === null) return null;
+		if (userTotal > officialPoints) return "user";
+		if (officialPoints > userTotal) return "official";
+		return "tie";
+	}, [userTotal, officialPoints]);
+
+	const diff = useMemo(
+		() => (officialPoints !== null && userTotal !== null ? userTotal - officialPoints : null),
+		[officialPoints, userTotal],
+	);
 
 	const bench = useMemo(() => {
 		const officialIds = new Set(activeStarters.map((p) => p.player_id));
@@ -102,8 +116,11 @@ export function useRosterCard({
 		activeStarters,
 		playerPoints,
 		weekHasScoring,
+		officialPoints,
 		userTotal,
+		diff,
 		winner,
+		hasOverrides,
 		overrides,
 		bench,
 		eligiblePicksBySlot,

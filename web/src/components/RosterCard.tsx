@@ -46,6 +46,10 @@ function StarterRow({
 	overridePoints,
 }: StarterRowProps) {
 	const isOverridden = overridePlayer !== null;
+	const delta =
+		officialPoints !== undefined && overridePoints !== undefined
+			? overridePoints - officialPoints
+			: null;
 
 	return (
 		<div className={styles.starterRow}>
@@ -61,10 +65,16 @@ function StarterRow({
 			</div>
 
 			<div className={styles.slotCell}>
-				<span className={`${styles.slotPill} ${isOverridden ? styles.slotPillOverridden : ""}`}>
-					{slotLabel(slot)}
-				</span>
-				{isOverridden && <span className={styles.slotArrow}> →</span>}
+				<div className={styles.slotRow}>
+					<span className={`${styles.slotPill} ${isOverridden ? styles.slotPillOverridden : ""}`}>
+						{slotLabel(slot)}
+					</span>
+					{delta !== null && (
+						<span className={`${styles.deltaBadge} ${delta >= 0 ? styles.deltaPos : styles.deltaNeg}`}>
+							{delta >= 0 ? "+" : ""}{delta.toFixed(1)}
+						</span>
+					)}
+				</div>
 			</div>
 
 			<div className={styles.pickCell}>
@@ -122,8 +132,11 @@ export default function RosterCard({
 		activeStarters,
 		playerPoints,
 		weekHasScoring,
+		officialPoints,
 		userTotal,
+		diff,
 		winner,
+		hasOverrides,
 		overrides,
 		bench,
 		eligiblePicksBySlot,
@@ -141,26 +154,40 @@ export default function RosterCard({
 
 	return (
 		<div className={styles.rosterCard}>
-			<div className={styles.teamHeader}>
-				<h2>{roster.team_name || `Team ${roster.roster_id}`}</h2>
-				<div className={styles.headerScores}>
-					{weekMatchup && (
-						<span className={styles.officialScore}>
-							Official: {(weekMatchup.custom_points ?? weekMatchup.points).toFixed(2)}
+			<h2 className={styles.teamName}>{roster.team_name || `Team ${roster.roster_id}`}</h2>
+
+			<RosterRarity players={activePlayers} starters={activeStarters} allScores={allScores} />
+
+			<div className={styles.headerScores}>
+				<div className={styles.scoreCol}>
+					<span className={styles.scoreLabel}>Official Score</span>
+					<span className={styles.officialScore}>{officialPoints?.toFixed(2) ?? "—"}</span>
+				</div>
+				<div className={styles.scoreDiff}>
+					<span
+						className={`${styles.winnerBadge} ${winner ? styles[winner] : ""}`}
+						style={{ visibility: hasOverrides && winner ? "visible" : "hidden" }}
+					>
+						{winner ? { user: "You Win", official: "You Lose", tie: "Tie" }[winner] : "—"}
+					</span>
+					<span
+						className={`${styles.diffBadge} ${diff !== null && diff >= 0 ? styles.deltaPos : styles.deltaNeg}`}
+						style={{ visibility: hasOverrides && diff !== null ? "visible" : "hidden" }}
+					>
+						{diff !== null ? `${diff >= 0 ? "+" : ""}${diff.toFixed(2)}` : "—"}
+					</span>
+				</div>
+				<div className={`${styles.scoreCol} ${styles.scoreColRight}`}>
+					<span className={styles.scoreLabel}>Your Score</span>
+					{hasOverrides ? (
+						<span className={`${styles.userScore} ${winner ? styles[`userScore_${winner}`] : ""}`}>
+							{userTotal?.toFixed(2) ?? "—"}
 						</span>
-					)}
-					{userTotal !== null && (
-						<span className={styles.userScore}>You: {userTotal.toFixed(2)}</span>
-					)}
-					{winner && (
-						<span className={`${styles.winnerBadge} ${styles[winner]}`}>
-							{{ user: "You Win", official: "You Lose", tie: "Tie" }[winner]}
-						</span>
+					) : (
+						<span className={styles.noPicks}>No picks yet</span>
 					)}
 				</div>
 			</div>
-
-			<RosterRarity players={activePlayers} starters={activeStarters} allScores={allScores} />
 
 			<div className={styles.section}>
 				<div className={styles.columnHeaders}>
