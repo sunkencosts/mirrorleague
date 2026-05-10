@@ -156,7 +156,7 @@ func (s *Store) UpdateLineup(ctx context.Context, id string, starters []string) 
 
 func scanUserLeague(row scanner) (provider.UserLeague, error) {
 	var ul provider.UserLeague
-	err := row.Scan(&ul.UserID, &ul.LeagueID, &ul.Label, &ul.Source, &ul.CreatedAt)
+	err := row.Scan(&ul.UserID, &ul.LeagueID, &ul.Label, &ul.Source, &ul.CreatedAt, &ul.UpdatedAt)
 	return ul, err
 }
 
@@ -164,8 +164,8 @@ func (s *Store) SaveUserLeague(ctx context.Context, userID, leagueID, source, la
 	row := s.pool.QueryRow(ctx, `
 		INSERT INTO league_bookmarks (user_id, league_id, source, label)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (user_id, league_id, source) DO UPDATE SET label = EXCLUDED.label
-		RETURNING user_id, league_id, label, source, created_at
+		ON CONFLICT (user_id, league_id, source) DO UPDATE SET label = EXCLUDED.label, updated_at = now()
+		RETURNING user_id, league_id, label, source, created_at, updated_at
 	`, userID, leagueID, source, label)
 	ul, err := scanUserLeague(row)
 	if err != nil {
@@ -176,7 +176,7 @@ func (s *Store) SaveUserLeague(ctx context.Context, userID, leagueID, source, la
 
 func (s *Store) ListUserLeagues(ctx context.Context, userID string) ([]provider.UserLeague, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT user_id, league_id, label, source, created_at
+		SELECT user_id, league_id, label, source, created_at, updated_at
 		FROM league_bookmarks
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -203,9 +203,9 @@ func (s *Store) ListUserLeagues(ctx context.Context, userID string) ([]provider.
 func (s *Store) UpdateUserLeague(ctx context.Context, userID, leagueID, source, label string) (provider.UserLeague, error) {
 	row := s.pool.QueryRow(ctx, `
 		UPDATE league_bookmarks
-		SET label = $4
+		SET label = $4, updated_at = now()
 		WHERE user_id = $1 AND league_id = $2 AND source = $3
-		RETURNING user_id, league_id, label, source, created_at
+		RETURNING user_id, league_id, label, source, created_at, updated_at
 	`, userID, leagueID, source, label)
 	ul, err := scanUserLeague(row)
 	if err != nil {
@@ -223,4 +223,65 @@ func (s *Store) DeleteUserLeague(ctx context.Context, userID, leagueID, source s
 		return pgx.ErrNoRows
 	}
 	return nil
+}
+
+func scanAuthUser(row scanner) (provider.AuthUser, error) {
+	var user provider.AuthUser
+	err := row.Scan(&user.ID, &user.Email, &user.Username)
+	return user, err
+}
+
+func (s *Store) CreateOrGetOAuthUser(ctx context.Context, oauthProvider, providerID, email, username string) (provider.AuthUser, error) {
+	row := s.pool.QueryRow(ctx, `
+		INSERT INTO users (oauth_provider, oauth_id, email, username)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (oauth_provider, oauth_id) DO UPDATE
+			SET email = EXCLUDED.email
+		RETURNING id, email, username
+	`, oauthProvider, providerID, email, username)
+	u, err := scanAuthUser(row)
+	if err != nil {
+		return provider.AuthUser{}, fmt.Errorf("creating or getting oauth user %s/%s: %w", oauthProvider, providerID, err)
+	}
+	return u, nil
+}
+
+func (s *Store) MergeAnonymousData(ctx context.Context, anonymousID, userID string) error {
+	if anonymousID == userID {
+		return nil
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("beginning merge transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, `
+		WITH moved AS (
+			INSERT INTO league_bookmarks (user_id, league_id, source, label, created_at, updated_at)
+			SELECT $1, league_id, source, label, created_at, updated_at
+			FROM league_bookmarks WHERE user_id = $2
+			ON CONFLICT (user_id, league_id, source) DO NOTHING
+		)
+		DELETE FROM league_bookmarks WHERE user_id = $2
+	`, userID, anonymousID)
+	if err != nil {
+		return fmt.Errorf("merging bookmarks: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		WITH moved AS (
+			INSERT INTO lineups (user_id, league_id, source, roster_id, week_number, starters, created_at, updated_at)
+			SELECT $1, league_id, source, roster_id, week_number, starters, created_at, updated_at
+			FROM lineups WHERE user_id = $2
+			ON CONFLICT (user_id, league_id, roster_id, week_number, source) DO NOTHING
+		)
+		DELETE FROM lineups WHERE user_id = $2
+	`, userID, anonymousID)
+	if err != nil {
+		return fmt.Errorf("merging lineups: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }

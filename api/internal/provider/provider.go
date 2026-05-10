@@ -11,6 +11,12 @@ type User struct {
 	DisplayName string `json:"display_name"`
 }
 
+type AuthUser struct {
+	ID       string `json:"id"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+}
+
 type League struct {
 	Name     string `json:"name"`
 	Status   string `json:"status"`
@@ -227,6 +233,7 @@ type UserLeague struct {
 	LeagueID  string    `json:"league_id"`
 	Label     string    `json:"label"`
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 	IconURL   string    `json:"icon_url"`
 	Source    string    `json:"source"`
 }

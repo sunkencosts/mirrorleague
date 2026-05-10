@@ -30,6 +30,17 @@ CREATE TABLE league_bookmarks(
     source text NOT NULL,
     label text NOT NULL DEFAULT '',
     created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, league_id, source)
+);
+
+CREATE TABLE users(
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    oauth_provider text NOT NULL,
+    oauth_id text NOT NULL,
+    email text NOT NULL,
+    username text NOT NULL UNIQUE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (oauth_provider, oauth_id)
 );
 

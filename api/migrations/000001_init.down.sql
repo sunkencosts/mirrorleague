@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS users;
+
 DROP TABLE IF EXISTS lineups;
 
 DROP TABLE IF EXISTS players;
