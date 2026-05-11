@@ -27,3 +27,8 @@ Entire point is to submit a better lineup and see if you beat the owner.
 
 # Bugs
 - Bad league ID is not handled on "Connect league"
+
+# Auth
+- figure out how testing works. I don't want to have to auth every time.
+- Dev login: hit GET /api/dev/login (only works when APP_ENV=development). Sets auth_token cookie, redirects to frontend. Accepts optional ?user_id=&email=&username= query params.
+- Logout clears the cookie client-side but the JWT stays valid server-side until it expires (30 days). This is accepted — stateless JWTs can't be revoked without a server-side blocklist. If token revocation becomes important, add a short expiry + refresh token or a Redis blocklist.

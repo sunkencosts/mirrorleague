@@ -18,6 +18,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sunkencosts/mirror-me/internal/db"
+	"github.com/sunkencosts/mirror-me/internal/googleauth"
 	"github.com/sunkencosts/mirror-me/internal/sleeper"
 	"github.com/sunkencosts/mirror-me/pkg/config"
 )
@@ -27,6 +28,10 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	defer cancel()
 
 	cfg := config.Load(getenv)
+
+	if cfg.JWTSecret == "" {
+		return fmt.Errorf("JWT_SECRET must be set")
+	}
 
 	dbpool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -40,6 +45,14 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	}
 	log.Println("database connected")
 	sleeperClient := sleeper.New(cfg.SleeperBaseURL, store, cfg.CurrentWeek)
+	googleClient := googleauth.New(googleauth.Config{
+		ClientID:     cfg.GoogleClientID,
+		ClientSecret: cfg.GoogleClientSecret,
+		RedirectURL:  cfg.GoogleRedirectURL,
+		AuthURL:      cfg.GoogleAuthURL,
+		TokenURL:     cfg.GoogleTokenURL,
+		UserInfoURL:  cfg.GoogleUserInfoURL,
+	})
 
 	migrateURL := strings.Replace(cfg.DatabaseURL, "postgresql://", "pgx5://", 1)
 	migrateURL = strings.Replace(migrateURL, "postgres://", "pgx5://", 1)
@@ -50,7 +63,7 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("running migrations: %w", err)
 	}
-	srv := NewServer(sleeperClient, cfg, store)
+	srv := NewServer(sleeperClient, cfg, store, googleClient)
 
 	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
@@ -82,24 +95,29 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	return nil
 }
 
-func NewServer(sleeperClient sleeperDeps, cfg config.Config, store *db.Store) http.Handler {
+func NewServer(sleeperClient sleeperDeps, cfg config.Config, store *db.Store, googleClient *googleauth.Client) http.Handler {
 	mux := http.NewServeMux()
-	addRoutes(mux, sleeperClient, store, cfg)
+	addRoutes(mux, sleeperClient, store, cfg, googleClient)
 
 	var handler http.Handler = mux
-	handler = corsMiddleware(handler)
+	handler = corsMiddleware(cfg.FrontendURL)(handler)
 	return handler
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+func corsMiddleware(frontendURL string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Origin") != "" {
+				w.Header().Set("Access-Control-Allow-Origin", frontendURL)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }

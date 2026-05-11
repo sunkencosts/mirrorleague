@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -21,10 +22,16 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sunkencosts/mirror-me/internal/db"
+	"github.com/sunkencosts/mirror-me/internal/jwtauth"
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
 
 const testDatabaseURL = "postgres://mirrorme:mirrorme@localhost:5433/mirrorme_test"
+
+// testJWTSecret is used by signTestJWT and must match the JWT_SECRET env var in newTestServer.
+const testJWTSecret = "test-jwt-secret-32bytes-long-pad!"
+
+const testUserID = "00000000-0000-0000-0000-000000000001"
 
 // testPlayers is the fixed reference dataset seeded once before all tests run.
 // Use these player IDs in any Sleeper mock that needs player resolution.
@@ -52,7 +59,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalf("TestMain: connect test db: %v", err)
 	}
-	if _, err := pool.Exec(ctx, "TRUNCATE lineups, players, league_bookmarks RESTART IDENTITY CASCADE"); err != nil {
+	if _, err := pool.Exec(ctx, "TRUNCATE users, lineups, players, league_bookmarks RESTART IDENTITY CASCADE"); err != nil {
 		log.Fatalf("TestMain: truncate: %v", err)
 	}
 	if err := db.NewStore(pool).UpsertPlayers(ctx, testPlayers); err != nil {
@@ -70,13 +77,38 @@ func newTestServer(t *testing.T, sleeperHandler http.Handler, extraEnv ...map[st
 	if err != nil {
 		t.Fatalf("newTestServer: connect db: %v", err)
 	}
-	if _, err := pool.Exec(context.Background(), "TRUNCATE lineups, league_bookmarks"); err != nil {
-		t.Fatalf("newTestServer: truncate lineups: %v", err)
+	if _, err := pool.Exec(context.Background(), "TRUNCATE users, lineups, league_bookmarks"); err != nil {
+		t.Fatalf("newTestServer: truncate: %v", err)
 	}
 	pool.Close()
 
 	fakeSleeper := httptest.NewServer(sleeperHandler)
 	t.Cleanup(fakeSleeper.Close)
+
+	// fakeGoogle handles token exchange and userinfo for OAuth tests.
+	// The identity returned is derived from the auth code: each unique code produces
+	// a unique sub ("sub-<code>") and email ("<code>@test.example"), so tests that
+	// call doGoogleLogin with distinct codes are fully isolated.
+	fakeGoogle := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/token":
+			r.ParseForm() //nolint:errcheck — test server, form always valid
+			code := r.FormValue("code")
+			json.NewEncoder(w).Encode(map[string]any{
+				"access_token": code,
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+		case "/oauth2/v2/userinfo":
+			code := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+			json.NewEncoder(w).Encode(map[string]any{
+				"id":    "sub-" + code,
+				"email": code + "@test.example",
+			})
+		}
+	}))
+	t.Cleanup(fakeGoogle.Close)
 
 	port := freePort(t)
 	getenv := func(key string) string {
@@ -94,6 +126,22 @@ func newTestServer(t *testing.T, sleeperHandler http.Handler, extraEnv ...map[st
 			return testDatabaseURL
 		case "MIGRATIONS_URL":
 			return "file://../../migrations"
+		case "GOOGLE_CLIENT_ID":
+			return "test-client-id"
+		case "GOOGLE_CLIENT_SECRET":
+			return "test-client-secret"
+		case "GOOGLE_REDIRECT_URL":
+			return "http://localhost:" + port + "/api/auth/google/callback"
+		case "GOOGLE_AUTH_URL":
+			return fakeGoogle.URL + "/oauth2/v2/auth"
+		case "GOOGLE_TOKEN_URL":
+			return fakeGoogle.URL + "/token"
+		case "GOOGLE_USERINFO_URL":
+			return fakeGoogle.URL + "/oauth2/v2/userinfo"
+		case "JWT_SECRET":
+			return testJWTSecret
+		case "FRONTEND_URL":
+			return "http://localhost:9999"
 		}
 		return ""
 	}
@@ -108,6 +156,83 @@ func newTestServer(t *testing.T, sleeperHandler http.Handler, extraEnv ...map[st
 		t.Fatalf("server never became ready: %v", err)
 	}
 	return baseURL
+}
+
+// signTestJWT creates a valid HS256 JWT signed with testJWTSecret.
+func signTestJWT(userID, email, username string) string {
+	token, err := jwtauth.Sign([]byte(testJWTSecret), userID, email, username)
+	if err != nil {
+		panic(fmt.Sprintf("signTestJWT: %v", err))
+	}
+	return token
+}
+
+// authedJSONRequest builds a POST/PATCH request with Content-Type and Authorization headers set.
+func authedJSONRequest(method, url, token, body string) *http.Request {
+	req, _ := http.NewRequest(method, url, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	return req
+}
+
+// doGoogleLogin drives the full OAuth callback flow against a test server and
+// returns the JWT from the auth_token cookie set on the callback response.
+// code determines the fake identity: sub="sub-<code>", email="<code>@test.example".
+// Pass a distinct code per test to ensure each test uses an isolated identity.
+func doGoogleLogin(t *testing.T, baseURL, code string) string {
+	t.Helper()
+	noFollow := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// Initiate login — get state cookie and state value from redirect URL.
+	resp1, err := noFollow.Get(baseURL + "/api/auth/google")
+	if err != nil {
+		t.Fatalf("doGoogleLogin: initiate: %v", err)
+	}
+	resp1.Body.Close()
+	if resp1.StatusCode != http.StatusFound {
+		t.Fatalf("doGoogleLogin: expected 302 from login, got %d", resp1.StatusCode)
+	}
+	loc, err := url.Parse(resp1.Header.Get("Location"))
+	if err != nil {
+		t.Fatalf("doGoogleLogin: parse location: %v", err)
+	}
+	state := loc.Query().Get("state")
+	if state == "" {
+		t.Fatal("doGoogleLogin: no state in redirect URL")
+	}
+	var stateCookie *http.Cookie
+	for _, c := range resp1.Cookies() {
+		if c.Name == "oauth_state" {
+			stateCookie = c
+		}
+	}
+	if stateCookie == nil {
+		t.Fatal("doGoogleLogin: no oauth_state cookie")
+	}
+
+	// Hit the callback with the state and the caller-supplied code.
+	callbackURL := baseURL + "/api/auth/google/callback?code=" + url.QueryEscape(code) + "&state=" + url.QueryEscape(state)
+	req2, _ := http.NewRequest(http.MethodGet, callbackURL, nil)
+	req2.AddCookie(stateCookie)
+	resp2, err := noFollow.Do(req2)
+	if err != nil {
+		t.Fatalf("doGoogleLogin: callback: %v", err)
+	}
+	resp2.Body.Close()
+	if resp2.StatusCode != http.StatusFound {
+		t.Fatalf("doGoogleLogin: callback expected 302, got %d", resp2.StatusCode)
+	}
+	for _, c := range resp2.Cookies() {
+		if c.Name == "auth_token" {
+			return c.Value
+		}
+	}
+	t.Fatalf("doGoogleLogin: no auth_token cookie in callback response")
+	return ""
 }
 
 func freePort(t *testing.T) string {
@@ -144,6 +269,343 @@ func waitForReady(ctx context.Context, timeout time.Duration, endpoint string) e
 			}
 			time.Sleep(250 * time.Millisecond)
 		}
+	}
+}
+
+func TestGoogleCallback_NewUser(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+	token := doGoogleLogin(t, baseURL, "new-user")
+
+	claims, err := jwtauth.Validate([]byte(testJWTSecret), token)
+	if err != nil {
+		t.Fatalf("validating JWT: %v", err)
+	}
+	if claims.Email != "new-user@test.example" {
+		t.Errorf("expected email %q in JWT, got %q", "new-user@test.example", claims.Email)
+	}
+	if claims.Subject == "" {
+		t.Error("expected non-empty sub claim in JWT")
+	}
+
+	pool, err := pgxpool.New(context.Background(), testDatabaseURL)
+	if err != nil {
+		t.Fatalf("connect db: %v", err)
+	}
+	defer pool.Close()
+	var count int
+	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM users WHERE oauth_id = 'sub-new-user'").Scan(&count); err != nil {
+		t.Fatalf("counting users: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 user row after new login, got %d", count)
+	}
+}
+
+func TestGoogleCallback_ExistingUser(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	token1 := doGoogleLogin(t, baseURL, "existing-user")
+	token2 := doGoogleLogin(t, baseURL, "existing-user")
+
+	claims1, err := jwtauth.Validate([]byte(testJWTSecret), token1)
+	if err != nil {
+		t.Fatalf("validating JWT 1: %v", err)
+	}
+	claims2, err := jwtauth.Validate([]byte(testJWTSecret), token2)
+	if err != nil {
+		t.Fatalf("validating JWT 2: %v", err)
+	}
+	if claims1.Subject != claims2.Subject {
+		t.Errorf("expected same sub on both logins, got %q and %q", claims1.Subject, claims2.Subject)
+	}
+
+	pool, err := pgxpool.New(context.Background(), testDatabaseURL)
+	if err != nil {
+		t.Fatalf("connect db: %v", err)
+	}
+	defer pool.Close()
+	var count int
+	if err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM users WHERE oauth_id = 'sub-existing-user'").Scan(&count); err != nil {
+		t.Fatalf("counting users: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected exactly 1 user row after two logins with same Google identity, got %d", count)
+	}
+}
+
+func TestAuthMe_Valid(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+	token := signTestJWT("00000000-0000-0000-0000-000000000099", "me@example.com", "cool_bear")
+
+	req, _ := http.NewRequest(http.MethodGet, baseURL+"/api/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var user provider.AuthUser
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if user.ID != "00000000-0000-0000-0000-000000000099" {
+		t.Errorf("expected id %q, got %q", "00000000-0000-0000-0000-000000000099", user.ID)
+	}
+	if user.Email != "me@example.com" {
+		t.Errorf("expected email %q, got %q", "me@example.com", user.Email)
+	}
+	if user.Username != "cool_bear" {
+		t.Errorf("expected username %q, got %q", "cool_bear", user.Username)
+	}
+}
+
+func TestAuthMe_NoToken(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	resp, err := http.Get(baseURL + "/api/auth/me")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestLogout_ClearsCookie(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/api/auth/logout", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+	for _, c := range resp.Cookies() {
+		if c.Name == "auth_token" && c.MaxAge < 0 {
+			return
+		}
+	}
+	t.Error("expected auth_token cookie with MaxAge < 0 in logout response")
+}
+
+func TestDevLogin_IssuesUsableToken(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler(), map[string]string{"APP_ENV": "development"})
+
+	noFollow := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := noFollow.Get(baseURL + "/api/dev/login")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("expected 302, got %d", resp.StatusCode)
+	}
+	var token string
+	for _, c := range resp.Cookies() {
+		if c.Name == "auth_token" {
+			token = c.Value
+		}
+	}
+	if token == "" {
+		t.Fatal("expected auth_token cookie in dev login response")
+	}
+
+	// Token must be accepted by a protected route and carry the default dev identity.
+	req, _ := http.NewRequest(http.MethodGet, baseURL+"/api/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	meResp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("/api/auth/me request failed: %v", err)
+	}
+	defer meResp.Body.Close()
+	if meResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from /api/auth/me with dev token, got %d", meResp.StatusCode)
+	}
+	var user provider.AuthUser
+	if err := json.NewDecoder(meResp.Body).Decode(&user); err != nil {
+		t.Fatalf("decode /api/auth/me: %v", err)
+	}
+	if user.ID != "00000000-0000-0000-0000-000000000001" {
+		t.Errorf("expected dev user_id, got %q", user.ID)
+	}
+	if user.Email != "dev@localhost" {
+		t.Errorf("expected dev email, got %q", user.Email)
+	}
+	if user.Username != "dev_user" {
+		t.Errorf("expected dev username, got %q", user.Username)
+	}
+}
+
+func TestDevLogin_NotAvailableInProduction(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler(), map[string]string{"APP_ENV": "production"})
+
+	resp, err := http.Get(baseURL + "/api/dev/login")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 for dev login in production, got %d", resp.StatusCode)
+	}
+}
+
+func TestMerge_ReassociatesBookmarks(t *testing.T) {
+	const anonID = "00000000-0000-0000-0000-000000000087"
+	const realUserID = "00000000-0000-0000-0000-000000000088"
+
+	baseURL := newTestServer(t, noopHandler())
+	saveTestUserLeague(t, baseURL, anonID, "league-merge-1", "sleeper", "Anon Bookmark")
+
+	token := signTestJWT(realUserID, "merge@example.com", "merge_user")
+	body := fmt.Sprintf(`{"anonymous_id":%q}`, anonID)
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/auth/merge", token, body))
+	if err != nil {
+		t.Fatalf("merge request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	listResp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=" + realUserID)
+	if err != nil {
+		t.Fatalf("list request failed: %v", err)
+	}
+	defer listResp.Body.Close()
+	var leagues []provider.UserLeague
+	if err := json.NewDecoder(listResp.Body).Decode(&leagues); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if len(leagues) != 1 || leagues[0].LeagueID != "league-merge-1" {
+		t.Errorf("expected bookmark re-keyed to real user, got %+v", leagues)
+	}
+
+	anonResp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=" + anonID)
+	if err != nil {
+		t.Fatalf("anon list request failed: %v", err)
+	}
+	defer anonResp.Body.Close()
+	var anonLeagues []provider.UserLeague
+	json.NewDecoder(anonResp.Body).Decode(&anonLeagues)
+	if len(anonLeagues) != 0 {
+		t.Errorf("expected 0 bookmarks under anon after merge, got %d", len(anonLeagues))
+	}
+}
+
+func TestMerge_ReassociatesLineups(t *testing.T) {
+	const anonID = "00000000-0000-0000-0000-000000000010"
+	const realUserID = "00000000-0000-0000-0000-000000000011"
+
+	baseURL := newTestServer(t, lineupSleeperHandler())
+
+	anonToken := signTestJWT(anonID, "anon@example.com", "anon_user")
+	createTestLineup(t, baseURL, anonToken)
+
+	realToken := signTestJWT(realUserID, "real@example.com", "real_user")
+	body := fmt.Sprintf(`{"anonymous_id":%q}`, anonID)
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/auth/merge", realToken, body))
+	if err != nil {
+		t.Fatalf("merge request: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	listURL := baseURL + "/api/lineups?user_id=" + realUserID + "&league_id=test-league&week_number=1"
+	listResp, err := http.Get(listURL)
+	if err != nil {
+		t.Fatalf("list request: %v", err)
+	}
+	defer listResp.Body.Close()
+	var lineups []provider.Lineup
+	if err := json.NewDecoder(listResp.Body).Decode(&lineups); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(lineups) != 1 {
+		t.Errorf("expected 1 lineup under real user after merge, got %d", len(lineups))
+	}
+
+	anonListURL := baseURL + "/api/lineups?user_id=" + anonID + "&league_id=test-league&week_number=1"
+	anonResp, err := http.Get(anonListURL)
+	if err != nil {
+		t.Fatalf("anon list request: %v", err)
+	}
+	defer anonResp.Body.Close()
+	var anonLineups []provider.Lineup
+	json.NewDecoder(anonResp.Body).Decode(&anonLineups)
+	if len(anonLineups) != 0 {
+		t.Errorf("expected 0 lineups under anon after merge, got %d", len(anonLineups))
+	}
+}
+
+func TestMerge_Unauthenticated(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	body := `{"anonymous_id":"some-anon-id"}`
+	resp, err := http.Post(baseURL+"/api/auth/merge", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestCreateLineup_Unauthenticated(t *testing.T) {
+	baseURL := newTestServer(t, lineupSleeperHandler())
+
+	body := `{"source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
+	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestCreateLineup_Authenticated(t *testing.T) {
+	const userID = "00000000-0000-0000-0000-000000000099"
+	baseURL := newTestServer(t, lineupSleeperHandler())
+	token := signTestJWT(userID, "auth@example.com", "auth_user")
+
+	body := `{"source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/lineups", token, body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.StatusCode)
+	}
+	var lineup provider.Lineup
+	if err := json.NewDecoder(resp.Body).Decode(&lineup); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+	if lineup.UserID != userID {
+		t.Errorf("expected user_id %q from JWT, got %q", userID, lineup.UserID)
 	}
 }
 
@@ -281,10 +743,12 @@ func lineupSleeperHandler() http.Handler {
 	})
 }
 
-func createTestLineup(t *testing.T, baseURL string) provider.Lineup {
+// createTestLineup posts a lineup authenticated as token and returns the created lineup.
+// user_id is taken from the JWT sub, not the request body.
+func createTestLineup(t *testing.T, baseURL, token string) provider.Lineup {
 	t.Helper()
-	body := `{"user_id":"00000000-0000-0000-0000-000000000001","source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
-	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
+	body := `{"source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/lineups", token, body))
 	if err != nil {
 		t.Fatalf("createTestLineup: request failed: %v", err)
 	}
@@ -301,9 +765,10 @@ func createTestLineup(t *testing.T, baseURL string) provider.Lineup {
 
 func TestCreateLineup(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
+	token := signTestJWT(testUserID, "test@example.com", "test_user")
 
-	body := `{"user_id":"00000000-0000-0000-0000-000000000001","source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
-	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
+	body := `{"source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/lineups", token, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -322,8 +787,8 @@ func TestCreateLineup(t *testing.T) {
 	if loc := resp.Header.Get("Location"); loc != "/api/lineups/"+lineup.ID {
 		t.Errorf("expected Location header %q, got %q", "/api/lineups/"+lineup.ID, loc)
 	}
-	if lineup.UserID != "00000000-0000-0000-0000-000000000001" {
-		t.Errorf("expected user_id %q, got %q", "00000000-0000-0000-0000-000000000001", lineup.UserID)
+	if lineup.UserID != testUserID {
+		t.Errorf("expected user_id %q, got %q", testUserID, lineup.UserID)
 	}
 	if lineup.LeagueID != "test-league" {
 		t.Errorf("expected league_id %q, got %q", "test-league", lineup.LeagueID)
@@ -338,11 +803,13 @@ func TestCreateLineup(t *testing.T) {
 		t.Errorf("unexpected starters: %v", lineup.Starters)
 	}
 }
+
 func TestCreateLineup_InvalidPlayer(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
+	token := signTestJWT(testUserID, "test@example.com", "test_user")
 
-	body := `{"user_id":"00000000-0000-0000-0000-000000000001","source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["999"]}`
-	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
+	body := `{"source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["999"]}`
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/lineups", token, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -352,9 +819,11 @@ func TestCreateLineup_InvalidPlayer(t *testing.T) {
 		t.Errorf("expected 400, got %d", resp.StatusCode)
 	}
 }
+
 func TestGetLineup(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
-	created := createTestLineup(t, baseURL)
+	token := signTestJWT(testUserID, "test@example.com", "test_user")
+	created := createTestLineup(t, baseURL, token)
 
 	resp, err := http.Get(baseURL + "/api/lineups/" + created.ID)
 	if err != nil {
@@ -387,14 +856,14 @@ func TestGetLineup_NotFound(t *testing.T) {
 		t.Errorf("expected 404, got %d", resp.StatusCode)
 	}
 }
+
 func TestUpdateLineup(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
-	created := createTestLineup(t, baseURL)
+	token := signTestJWT(testUserID, "test@example.com", "test_user")
+	created := createTestLineup(t, baseURL, token)
 
-	body := `{"user_id":"00000000-0000-0000-0000-000000000001","starters":["111","333"]}`
-	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/lineups/"+created.ID, strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	body := `{"starters":["111","333"]}`
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPatch, baseURL+"/api/lineups/"+created.ID, token, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -414,12 +883,12 @@ func TestUpdateLineup(t *testing.T) {
 
 func TestUpdateLineup_WrongUser(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
-	created := createTestLineup(t, baseURL)
+	token1 := signTestJWT(testUserID, "user1@example.com", "user_one")
+	token2 := signTestJWT("00000000-0000-0000-0000-000000000002", "user2@example.com", "user_two")
+	created := createTestLineup(t, baseURL, token1)
 
-	body := `{"user_id":"00000000-0000-0000-0000-000000000002","starters":["111"]}`
-	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/lineups/"+created.ID, strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	body := `{"starters":["111"]}`
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPatch, baseURL+"/api/lineups/"+created.ID, token2, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -432,11 +901,10 @@ func TestUpdateLineup_WrongUser(t *testing.T) {
 
 func TestUpdateLineup_NotFound(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
+	token := signTestJWT(testUserID, "test@example.com", "test_user")
 
-	body := `{"user_id":"00000000-0000-0000-0000-000000000001","starters":["111"]}`
-	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/lineups/00000000-0000-0000-0000-000000000000", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	body := `{"starters":["111"]}`
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPatch, baseURL+"/api/lineups/00000000-0000-0000-0000-000000000000", token, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -449,7 +917,8 @@ func TestUpdateLineup_NotFound(t *testing.T) {
 
 func TestListLineups_FilterByRoster(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
-	created := createTestLineup(t, baseURL)
+	token := signTestJWT(testUserID, "test@example.com", "test_user")
+	created := createTestLineup(t, baseURL, token)
 
 	url := baseURL + "/api/lineups?user_id=" + created.UserID + "&league_id=test-league&week_number=1&roster_id=1"
 	resp, err := http.Get(url)
@@ -475,7 +944,8 @@ func TestListLineups_FilterByRoster(t *testing.T) {
 
 func TestListLineups_All(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
-	created := createTestLineup(t, baseURL)
+	token := signTestJWT(testUserID, "test@example.com", "test_user")
+	created := createTestLineup(t, baseURL, token)
 
 	url := baseURL + "/api/lineups?user_id=" + created.UserID + "&league_id=test-league&week_number=1"
 	resp, err := http.Get(url)
@@ -637,10 +1107,11 @@ func compareSleeperHandler() http.Handler {
 	})
 }
 
-func createLineupForCompare(t *testing.T, baseURL, userID string) provider.Lineup {
+// createLineupForCompare posts a lineup authenticated as token for the compare-score test fixture.
+func createLineupForCompare(t *testing.T, baseURL, token string) provider.Lineup {
 	t.Helper()
-	body := fmt.Sprintf(`{"user_id":%q,"source":"sleeper","league_id":"abc","roster_id":1,"week_number":8,"starters":["111","333"]}`, userID)
-	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
+	body := `{"source":"sleeper","league_id":"abc","roster_id":1,"week_number":8,"starters":["111","333"]}`
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/lineups", token, body))
 	if err != nil {
 		t.Fatalf("createLineupForCompare: request failed: %v", err)
 	}
@@ -656,11 +1127,12 @@ func createLineupForCompare(t *testing.T, baseURL, userID string) provider.Lineu
 }
 
 func TestCompareLineup(t *testing.T) {
-	const userID = "00000000-0000-0000-0000-000000000002"
+	const compareUserID = "00000000-0000-0000-0000-000000000002"
 	baseURL := newTestServer(t, compareSleeperHandler())
-	createLineupForCompare(t, baseURL, userID)
+	token := signTestJWT(compareUserID, "compare@example.com", "compare_user")
+	createLineupForCompare(t, baseURL, token)
 
-	resp, err := http.Get(baseURL + "/api/league/abc/week/8/roster/1/compare?user_id=" + userID)
+	resp, err := http.Get(baseURL + "/api/league/abc/week/8/roster/1/compare?user_id=" + compareUserID)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

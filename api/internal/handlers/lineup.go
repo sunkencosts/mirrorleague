@@ -24,7 +24,6 @@ type lineupMatchupProvider interface {
 }
 
 type createLineupRequest struct {
-	UserID     string   `json:"user_id"`
 	LeagueID   string   `json:"league_id"`
 	Source     string   `json:"source"`
 	RosterID   int      `json:"roster_id"`
@@ -33,12 +32,17 @@ type createLineupRequest struct {
 }
 
 type updateLineupRequest struct {
-	UserID   string   `json:"user_id"`
 	Starters []string `json:"starters"`
 }
 
 func HandleCreateLineup(store lineupStore, p lineupMatchupProvider) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := ClaimsFromContext(r.Context())
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		req, err := decode[createLineupRequest](r)
 		if err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -55,7 +59,7 @@ func HandleCreateLineup(store lineupStore, p lineupMatchupProvider) http.Handler
 			return
 		}
 
-		lineup, err := store.CreateLineup(r.Context(), req.UserID, req.LeagueID, req.Source, req.RosterID, req.WeekNumber, req.Starters)
+		lineup, err := store.CreateLineup(r.Context(), claims.Subject, req.LeagueID, req.Source, req.RosterID, req.WeekNumber, req.Starters)
 		if err != nil {
 			http.Error(w, "failed to create lineup", http.StatusInternalServerError)
 			return
@@ -67,6 +71,12 @@ func HandleCreateLineup(store lineupStore, p lineupMatchupProvider) http.Handler
 
 func HandleUpdateLineup(store lineupStore, p lineupMatchupProvider) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := ClaimsFromContext(r.Context())
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		id := r.PathValue("id")
 		if _, err := uuid.Parse(id); err != nil {
 			http.Error(w, "invalid lineup id", http.StatusBadRequest)
@@ -88,7 +98,7 @@ func HandleUpdateLineup(store lineupStore, p lineupMatchupProvider) http.Handler
 			http.Error(w, "failed to get lineup", http.StatusInternalServerError)
 			return
 		}
-		if existing.UserID != req.UserID {
+		if existing.UserID != claims.Subject {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sunkencosts/mirror-me/internal/db"
+	"github.com/sunkencosts/mirror-me/internal/googleauth"
 	"github.com/sunkencosts/mirror-me/internal/handlers"
 	"github.com/sunkencosts/mirror-me/internal/provider"
 	"github.com/sunkencosts/mirror-me/pkg/config"
@@ -20,13 +21,25 @@ type sleeperDeps interface {
 }
 
 // Update api/api.md when adding or removing routes here.
-func addRoutes(mux *http.ServeMux, sleeperClient sleeperDeps, store *db.Store, cfg config.Config) {
+func addRoutes(mux *http.ServeMux, sleeperClient sleeperDeps, store *db.Store, cfg config.Config, googleClient *googleauth.Client) {
+	jwtSecret := []byte(cfg.JWTSecret)
+	requireAuth := handlers.RequireAuth(jwtSecret)
+
+	mux.Handle("GET /api/auth/google", handlers.HandleGoogleLogin(googleClient))
+	mux.Handle("GET /api/auth/google/callback", handlers.HandleGoogleCallback(googleClient, store, jwtSecret, cfg.FrontendURL))
+	mux.Handle("GET /api/auth/me", requireAuth(handlers.HandleAuthMe()))
+	mux.Handle("POST /api/auth/merge", requireAuth(handlers.HandleMerge(store)))
+	mux.Handle("DELETE /api/auth/logout", handlers.HandleLogout())
+	if cfg.AppEnv == "development" {
+		mux.Handle("GET /api/dev/login", handlers.HandleDevLogin(jwtSecret, cfg.FrontendURL))
+	}
+
 	mux.Handle("POST /api/league-bookmarks", handlers.HandleSaveUserLeague(store))
 	mux.Handle("GET /api/league-bookmarks", handlers.HandleListUserLeagues(store))
 	mux.Handle("PATCH /api/league-bookmarks/{leagueId}", handlers.HandleUpdateUserLeague(store))
 	mux.Handle("DELETE /api/league-bookmarks/{leagueId}", handlers.HandleDeleteUserLeague(store))
-	mux.Handle("POST /api/lineups", handlers.HandleCreateLineup(store, sleeperClient))
-	mux.Handle("PATCH /api/lineups/{id}", handlers.HandleUpdateLineup(store, sleeperClient))
+	mux.Handle("POST /api/lineups", requireAuth(handlers.HandleCreateLineup(store, sleeperClient)))
+	mux.Handle("PATCH /api/lineups/{id}", requireAuth(handlers.HandleUpdateLineup(store, sleeperClient)))
 	mux.Handle("GET /api/lineups", handlers.HandleListLineups(store))
 	mux.Handle("GET /api/lineups/{id}", handlers.HandleGetLineupByID(store))
 	mux.Handle("GET /api/league/{leagueId}/rosters", handlers.HandleGetRosters(sleeperClient))

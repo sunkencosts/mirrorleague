@@ -2,8 +2,11 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+var ErrUsernameConflict = errors.New("username already taken")
 
 type User struct {
 	UserID      string `json:"user_id"`

@@ -3,12 +3,21 @@ package config
 import "strconv"
 
 type Config struct {
-	Port           string
-	SleeperBaseURL string
-	RankingsCSVURL string
-	DatabaseURL    string
-	MigrationsURL  string
-	CurrentWeek    int
+	Port               string
+	SleeperBaseURL     string
+	RankingsCSVURL     string
+	DatabaseURL        string
+	MigrationsURL      string
+	CurrentWeek        int
+	AppEnv             string
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleRedirectURL  string
+	GoogleAuthURL      string
+	GoogleTokenURL     string
+	GoogleUserInfoURL  string
+	FrontendURL        string
+	JWTSecret          string
 }
 
 func Load(getenv func(string) string) Config {
@@ -38,12 +47,37 @@ func Load(getenv func(string) string) Config {
 			currentWeek = n
 		}
 	}
+	googleAuthURL := getenv("GOOGLE_AUTH_URL")
+	if googleAuthURL == "" {
+		googleAuthURL = "https://accounts.google.com/o/oauth2/auth"
+	}
+	googleTokenURL := getenv("GOOGLE_TOKEN_URL")
+	if googleTokenURL == "" {
+		googleTokenURL = "https://oauth2.googleapis.com/token"
+	}
+	googleUserInfoURL := getenv("GOOGLE_USERINFO_URL")
+	if googleUserInfoURL == "" {
+		googleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
+	}
+	frontendURL := getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173"
+	}
 	return Config{
-		Port:           port,
-		SleeperBaseURL: sleeperBaseURL,
-		RankingsCSVURL: rankingsCSVURL,
-		DatabaseURL:    databaseURL,
-		MigrationsURL:  migrationsURL,
-		CurrentWeek:    currentWeek,
+		AppEnv:             getenv("APP_ENV"),
+		Port:               port,
+		SleeperBaseURL:     sleeperBaseURL,
+		RankingsCSVURL:     rankingsCSVURL,
+		DatabaseURL:        databaseURL,
+		MigrationsURL:      migrationsURL,
+		CurrentWeek:        currentWeek,
+		GoogleClientID:     getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret: getenv("GOOGLE_CLIENT_SECRET"),
+		GoogleRedirectURL:  getenv("GOOGLE_REDIRECT_URL"),
+		GoogleAuthURL:      googleAuthURL,
+		GoogleTokenURL:     googleTokenURL,
+		GoogleUserInfoURL:  googleUserInfoURL,
+		FrontendURL:        frontendURL,
+		JWTSecret:          getenv("JWT_SECRET"),
 	}
 }

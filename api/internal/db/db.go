@@ -2,9 +2,11 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
@@ -241,6 +243,10 @@ func (s *Store) CreateOrGetOAuthUser(ctx context.Context, oauthProvider, provide
 	`, oauthProvider, providerID, email, username)
 	u, err := scanAuthUser(row)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "users_username_key" {
+			return provider.AuthUser{}, provider.ErrUsernameConflict
+		}
 		return provider.AuthUser{}, fmt.Errorf("creating or getting oauth user %s/%s: %w", oauthProvider, providerID, err)
 	}
 	return u, nil
