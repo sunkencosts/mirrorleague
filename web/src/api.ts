@@ -15,6 +15,9 @@ async function mutateJson<T>(method: string, url: string, body: unknown): Promis
 	if (!r.ok) {
 		throw new Error(`${r.status} ${r.statusText}`);
 	}
+	if (r.status === 204) {
+		return undefined as T;
+	}
 	return r.json();
 }
 

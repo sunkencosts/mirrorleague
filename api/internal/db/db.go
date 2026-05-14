@@ -65,6 +65,32 @@ func (s *Store) UpsertPlayers(ctx context.Context, players []provider.Player) er
 	return nil
 }
 
+func (s *Store) ListActiveFantasyPlayers(ctx context.Context) ([]provider.SlimPlayer, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT player_id, first_name, last_name, team, fantasy_positions, rarity
+		 FROM players
+		 WHERE active = true AND fantasy_positions && $1`,
+		[]string{"QB", "RB", "WR", "TE", "K", "DEF"})
+	if err != nil {
+		return nil, fmt.Errorf("listing active fantasy players: %w", err)
+	}
+	defer rows.Close()
+
+	players := []provider.SlimPlayer{}
+	for rows.Next() {
+		var p provider.SlimPlayer
+		if err := rows.Scan(&p.PlayerID, &p.FirstName, &p.LastName, &p.Team, &p.FantasyPositions, &p.Rarity); err != nil {
+			return nil, fmt.Errorf("scanning slim player: %w", err)
+		}
+		p.ImageURL = "https://sleepercdn.com/content/nfl/players/thumb/" + p.PlayerID + ".jpg"
+		players = append(players, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating slim players: %w", err)
+	}
+	return players, nil
+}
+
 func (s *Store) GetPlayersByIDs(ctx context.Context, ids []string) (map[string]provider.Player, error) {
 	rows, err := s.pool.Query(ctx, "SELECT player_id, first_name, last_name, team, active, fantasy_positions, number, age, rarity FROM players WHERE player_id = ANY($1)", ids)
 

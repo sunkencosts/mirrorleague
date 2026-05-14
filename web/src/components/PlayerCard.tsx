@@ -27,7 +27,7 @@ function PlayerCard({ player, reversed, points, dimmed, compact }: Props) {
 			<img
 				style={{
 					boxShadow:
-						dimmed || compact ? "0 0 0 1px var(--border-ui)" : RARITY_GLOW[player.rarity || "grey"],
+						dimmed ? "0 0 0 1px var(--border-ui)" : RARITY_GLOW[player.rarity || "grey"],
 				}}
 				src={player.image_url}
 				alt={`${player.first_name} ${player.last_name}`}

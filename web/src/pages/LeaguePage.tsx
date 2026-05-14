@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import { bookmarksKey, fetchJson, patchJson } from "../api";
 import LeagueSummary from "../components/LeagueSummary";
+import PlayerSearch from "../components/PlayerSearch";
 import RosterCard from "../components/RosterCard";
 import { useAuth } from "../context/AuthContext";
 import { computePowerScore } from "../scoring";
@@ -71,6 +72,9 @@ export default function LeaguePage() {
 	});
 
 	const patched = useRef(false);
+	const highlightTimer = useRef<ReturnType<typeof setTimeout>>();
+	useEffect(() => () => clearTimeout(highlightTimer.current), []);
+
 	useEffect(() => {
 		if (patched.current || !league?.name) {
 			return;
@@ -116,6 +120,15 @@ export default function LeaguePage() {
 		return null;
 	}
 
+	function scrollToRoster(rosterId: number) {
+		const el = document.getElementById(`roster-${rosterId}`);
+		if (!el) return;
+		el.scrollIntoView({ behavior: "smooth", block: "start" });
+		el.classList.add(styles.highlighted);
+		clearTimeout(highlightTimer.current);
+		highlightTimer.current = setTimeout(() => el.classList.remove(styles.highlighted), 1500);
+	}
+
 	return (
 		<>
 			<LeagueSummary
@@ -123,19 +136,21 @@ export default function LeaguePage() {
 				weekNumber={weekNumber}
 				onWeekChange={(w) => navigate(`/league/${leagueId}/week/${w}`)}
 			/>
+			<PlayerSearch rosters={rosters} onScrollToRoster={scrollToRoster} />
 			<div className={styles.rosterList}>
 				{rosters.map((roster) => (
-					<RosterCard
-						key={roster.roster_id}
-						roster={roster}
-						weekMatchup={matchupByRosterId.get(roster.roster_id) ?? null}
-						{...leagueConfig}
-						allScores={allScores}
-						leagueId={leagueId}
-						userId={userId}
-						lineups={lineups}
-						weekNumber={weekNumber}
-					/>
+					<div key={roster.roster_id} id={`roster-${roster.roster_id}`} className={styles.rosterWrapper}>
+						<RosterCard
+							roster={roster}
+							weekMatchup={matchupByRosterId.get(roster.roster_id) ?? null}
+							{...leagueConfig}
+							allScores={allScores}
+							leagueId={leagueId}
+							userId={userId}
+							lineups={lineups}
+							weekNumber={weekNumber}
+						/>
+					</div>
 				))}
 			</div>
 		</>

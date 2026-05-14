@@ -36,11 +36,11 @@ const testUserID = "00000000-0000-0000-0000-000000000001"
 // testPlayers is the fixed reference dataset seeded once before all tests run.
 // Use these player IDs in any Sleeper mock that needs player resolution.
 var testPlayers = []provider.Player{
-	{PlayerID: "111", FirstName: "Josh", LastName: "Allen", FantasyPositions: []string{"QB"}},
-	{PlayerID: "222", FirstName: "Justin", LastName: "Jefferson", FantasyPositions: []string{"WR"}},
-	{PlayerID: "333", FirstName: "Christian", LastName: "McCaffrey", FantasyPositions: []string{"RB"}},
-	{PlayerID: "444", FirstName: "Travis", LastName: "Kelce", FantasyPositions: []string{"TE"}},
-	{PlayerID: "555", FirstName: "Tyreek", LastName: "Hill", FantasyPositions: []string{"WR"}},
+	{PlayerID: "111", FirstName: "Josh", LastName: "Allen", FantasyPositions: []string{"QB"}, Active: true},
+	{PlayerID: "222", FirstName: "Justin", LastName: "Jefferson", FantasyPositions: []string{"WR"}, Active: true},
+	{PlayerID: "333", FirstName: "Christian", LastName: "McCaffrey", FantasyPositions: []string{"RB"}, Active: true},
+	{PlayerID: "444", FirstName: "Travis", LastName: "Kelce", FantasyPositions: []string{"TE"}, Active: true},
+	{PlayerID: "555", FirstName: "Tyreek", LastName: "Hill", FantasyPositions: []string{"WR"}, Active: true},
 }
 
 func TestMain(m *testing.M) {
@@ -77,8 +77,11 @@ func newTestServer(t *testing.T, sleeperHandler http.Handler, extraEnv ...map[st
 	if err != nil {
 		t.Fatalf("newTestServer: connect db: %v", err)
 	}
-	if _, err := pool.Exec(context.Background(), "TRUNCATE users, lineups, league_bookmarks"); err != nil {
+	if _, err := pool.Exec(context.Background(), "TRUNCATE users, lineups, players, league_bookmarks"); err != nil {
 		t.Fatalf("newTestServer: truncate: %v", err)
+	}
+	if err := db.NewStore(pool).UpsertPlayers(context.Background(), testPlayers); err != nil {
+		t.Fatalf("newTestServer: seed players: %v", err)
 	}
 	pool.Close()
 
@@ -1424,5 +1427,40 @@ func TestDeleteUserLeague_NotFound(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestGetPlayers(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	resp, err := http.Get(baseURL + "/api/players")
+	if err != nil {
+		t.Fatalf("GET /api/players: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var players []provider.SlimPlayer
+	if err := json.NewDecoder(resp.Body).Decode(&players); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if len(players) != len(testPlayers) {
+		t.Errorf("expected %d players, got %d", len(testPlayers), len(players))
+	}
+
+	for _, p := range players {
+		if p.PlayerID == "" {
+			t.Error("player has empty player_id")
+		}
+		if len(p.FantasyPositions) == 0 {
+			t.Errorf("player %s has no fantasy positions", p.PlayerID)
+		}
+		if p.ImageURL == "" {
+			t.Errorf("player %s has empty image_url", p.PlayerID)
+		}
 	}
 }

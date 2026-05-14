@@ -42,6 +42,7 @@ func addRoutes(mux *http.ServeMux, sleeperClient sleeperDeps, store *db.Store, c
 	mux.Handle("PATCH /api/lineups/{id}", requireAuth(handlers.HandleUpdateLineup(store, sleeperClient)))
 	mux.Handle("GET /api/lineups", handlers.HandleListLineups(store))
 	mux.Handle("GET /api/lineups/{id}", handlers.HandleGetLineupByID(store))
+	mux.Handle("GET /api/players", handlers.HandleGetPlayers(store))
 	mux.Handle("GET /api/league/{leagueId}/rosters", handlers.HandleGetRosters(sleeperClient))
 	mux.Handle("GET /api/league/{leagueId}/week/{week}", handlers.HandleGetWeekMatchups(sleeperClient))
 	mux.Handle("GET /api/league/{leagueId}/week/{week}/roster/{rosterId}/compare", handlers.HandleGetCompare(sleeperClient, store))

@@ -71,6 +71,16 @@ export interface AuthUser {
 	username: string;
 }
 
+export interface SlimPlayer {
+	player_id: string;
+	first_name: string;
+	last_name: string;
+	team: string;
+	fantasy_positions: string[];
+	image_url: string;
+	rarity: string;
+}
+
 export interface LeagueBookmark {
 	user_id: string;
 	league_id: string;

@@ -180,6 +180,16 @@ type Player struct {
 	Rarity           string   `json:"rarity"`
 }
 
+type SlimPlayer struct {
+	PlayerID         string   `json:"player_id"`
+	FirstName        string   `json:"first_name"`
+	LastName         string   `json:"last_name"`
+	Team             string   `json:"team"`
+	FantasyPositions []string `json:"fantasy_positions"`
+	ImageURL         string   `json:"image_url"`
+	Rarity           string   `json:"rarity"`
+}
+
 type Roster struct {
 	RosterID int      `json:"roster_id"`
 	OwnerID  string   `json:"owner_id"`

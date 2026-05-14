@@ -4,6 +4,15 @@
 	gap: 1rem;
 }
 
+@keyframes roster-flash {
+	0%, 20% { box-shadow: 0 0 0 3px var(--color-accent, #3b82f6); }
+	100%     { box-shadow: none; }
+}
+
+.highlighted {
+	animation: roster-flash 1.5s ease-out forwards;
+}
+
 .error {
 	color: var(--color-error);
 	margin-bottom: 1rem;
