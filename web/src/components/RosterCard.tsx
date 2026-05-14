@@ -70,8 +70,11 @@ function StarterRow({
 						{slotLabel(slot)}
 					</span>
 					{delta !== null && (
-						<span className={`${styles.deltaBadge} ${delta >= 0 ? styles.deltaPos : styles.deltaNeg}`}>
-							{delta >= 0 ? "+" : ""}{delta.toFixed(1)}
+						<span
+							className={`${styles.deltaBadge} ${delta >= 0 ? styles.deltaPos : styles.deltaNeg}`}
+						>
+							{delta >= 0 ? "+" : ""}
+							{delta.toFixed(1)}
 						</span>
 					)}
 				</div>
@@ -142,6 +145,7 @@ export default function RosterCard({
 		eligiblePicksBySlot,
 		slotKeys,
 		selectedIndex,
+		showAuthPrompt,
 		handleTogglePicker,
 		handlePickOverride,
 		handleClearOverride,
@@ -196,6 +200,11 @@ export default function RosterCard({
 					<span className={styles.colHeaderPick}>Your Pick</span>
 				</div>
 
+				{showAuthPrompt && (
+					<p className={styles.authPrompt}>
+						<a href="/api/auth/google">Sign in</a> to save your lineup picks.
+					</p>
+				)}
 				<div className={styles.starterGrid}>
 					{starterSlots.map((slot, i) => {
 						const official = activeStarters[i] ?? null;
@@ -220,7 +229,9 @@ export default function RosterCard({
 			</div>
 
 			<div className={styles.section}>
-				<h3 className={styles.sectionLabel}>Bench · {bench.length}/{benchSlots}</h3>
+				<h3 className={styles.sectionLabel}>
+					Bench · {bench.length}/{benchSlots}
+				</h3>
 				<div className={styles.playerList}>
 					{bench.map((player) => (
 						<PlayerCard
@@ -241,7 +252,9 @@ export default function RosterCard({
 
 			{irSlots > 0 && (
 				<div className={styles.section}>
-					<h3 className={styles.sectionLabel}>IR · {roster.reserve.length}/{irSlots}</h3>
+					<h3 className={styles.sectionLabel}>
+						IR · {roster.reserve.length}/{irSlots}
+					</h3>
 					<div className={styles.playerList}>
 						{roster.reserve.map((player) => (
 							<PlayerCard
@@ -256,7 +269,9 @@ export default function RosterCard({
 
 			{taxiSlots > 0 && (
 				<div className={styles.section}>
-					<h3 className={styles.sectionLabel}>Taxi · {roster.taxi.length}/{taxiSlots}</h3>
+					<h3 className={styles.sectionLabel}>
+						Taxi · {roster.taxi.length}/{taxiSlots}
+					</h3>
 					<div className={styles.playerList}>
 						{roster.taxi.map((player) => (
 							<PlayerCard

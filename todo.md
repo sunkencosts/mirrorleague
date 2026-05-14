@@ -1,11 +1,6 @@
 # Next
-Need to updat the way the score is display for:
-- each player. Have something more in the center with and an easy way to show +-
-- At the top for win/lose have +- as well.
-- it's always waiting for GET http://localhost:5173/api/lineups?user_id=2240d6f1-d529-42ec-b36b-1df8054a284f&league_id=1182073403987832832&week_number=1 to return before updating which is slow because we already have all the scores per player when they load.
-
 # FE
-- Show scores red/green after player starts.
+-
 - Use sleeper historical data to test.
 - search for a player
 - figure out a better way to rank teams
@@ -27,8 +22,3 @@ Entire point is to submit a better lineup and see if you beat the owner.
 
 # Bugs
 - Bad league ID is not handled on "Connect league"
-
-# Auth
-- figure out how testing works. I don't want to have to auth every time.
-- Dev login: hit GET /api/dev/login (only works when APP_ENV=development). Sets auth_token cookie, redirects to frontend. Accepts optional ?user_id=&email=&username= query params.
-- Logout clears the cookie client-side but the JWT stays valid server-side until it expires (30 days). This is accepted — stateless JWTs can't be revoked without a server-side blocklist. If token revocation becomes important, add a short expiry + refresh token or a Redis blocklist.

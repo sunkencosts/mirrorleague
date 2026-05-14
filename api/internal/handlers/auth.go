@@ -149,7 +149,7 @@ func HandleMerge(store authStore) http.Handler {
 			http.Error(w, "failed to merge", http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		encode(w, r, http.StatusOK, struct{}{})
 	})
 }
 

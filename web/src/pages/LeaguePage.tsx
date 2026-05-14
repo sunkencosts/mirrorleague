@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router";
 import { bookmarksKey, fetchJson, patchJson } from "../api";
 import LeagueSummary from "../components/LeagueSummary";
 import RosterCard from "../components/RosterCard";
-import { useUserId } from "../hooks/useUserId";
+import { useAuth } from "../context/AuthContext";
 import { computePowerScore } from "../scoring";
 import type { League, LeagueBookmark, LeagueConfig, Lineup, Roster, WeekMatchup } from "../types";
 import styles from "./LeaguePage.module.css";
@@ -13,7 +13,7 @@ export default function LeaguePage() {
 	const { leagueId = "", week } = useParams();
 	const weekNumber = week ? parseInt(week, 10) : 1;
 	const navigate = useNavigate();
-	const userId = useUserId();
+	const { userId } = useAuth();
 	const queryClient = useQueryClient();
 
 	const {

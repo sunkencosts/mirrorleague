@@ -54,12 +54,39 @@
 	font-size: 0.875rem;
 	padding: 0.4rem 0.875rem;
 	border-radius: 6px;
-	transition: background 0.15s, color 0.15s;
+	transition:
+		background 0.15s,
+		color 0.15s;
 }
 
 .nav a:hover {
 	background: var(--bg-hover);
 	color: var(--text);
+}
+
+.headerActions {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.username {
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.authBtn {
+	background: none;
+	border: 1px solid var(--border-ui);
+	border-radius: 6px;
+	color: var(--text);
+	cursor: pointer;
+	font-size: 0.875rem;
+	padding: 0.3rem 0.75rem;
+}
+
+.authBtn:hover {
+	background: var(--bg-hover);
 }
 
 .hamburger {
@@ -70,6 +97,33 @@
 	cursor: pointer;
 	color: inherit;
 	padding: 0.25rem;
+}
+
+.navUsername {
+	display: none;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+	padding: 0.4rem 0.875rem;
+}
+
+.navAuthBtn {
+	display: none;
+	background: none;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 0.875rem;
+	padding: 0.4rem 0.875rem;
+	border-radius: 6px;
+	text-align: left;
+	transition:
+		background 0.15s,
+		color 0.15s;
+}
+
+.navAuthBtn:hover {
+	background: var(--bg-hover);
+	color: var(--text);
 }
 
 @media (max-width: 640px) {
@@ -85,5 +139,15 @@
 
 	.navOpen {
 		display: flex;
+	}
+
+	.username,
+	.authBtn {
+		display: none;
+	}
+
+	.navUsername,
+	.navAuthBtn {
+		display: block;
 	}
 }

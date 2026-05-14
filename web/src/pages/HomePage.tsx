@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { bookmarksKey, postJson } from "../api";
 import LeagueBookmarks from "../components/LeagueBookmarks";
-import { useUserId } from "../hooks/useUserId";
+import { useAuth } from "../context/AuthContext";
 import type { LeagueBookmark } from "../types";
 import styles from "./HomePage.module.css";
 
@@ -11,7 +11,7 @@ export default function HomePage() {
 	const [leagueId, setLeagueId] = useState("1182073403987832832");
 	const [label, setLabel] = useState("");
 	const navigate = useNavigate();
-	const userId = useUserId();
+	const { userId } = useAuth();
 	const queryClient = useQueryClient();
 
 	const saveBookmark = useMutation({

@@ -36,7 +36,9 @@ function PlayerCard({ player, reversed, points, dimmed, compact }: Props) {
 				onError={onImageError}
 			/>
 			<div className={styles.playerInfo}>
-				<span className={[styles.playerName, dimmed && styles.nameStruck].filter(Boolean).join(" ")}>
+				<span
+					className={[styles.playerName, dimmed && styles.nameStruck].filter(Boolean).join(" ")}
+				>
 					{player.first_name} {player.last_name}
 				</span>
 				<span className={styles.playerMeta}>

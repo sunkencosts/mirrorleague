@@ -257,6 +257,14 @@ func (s *Store) MergeAnonymousData(ctx context.Context, anonymousID, userID stri
 		return nil
 	}
 
+	var isRealUser bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, anonymousID).Scan(&isRealUser); err != nil {
+		return fmt.Errorf("checking anonymous ID: %w", err)
+	}
+	if isRealUser {
+		return nil
+	}
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("beginning merge transaction: %w", err)

@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import App from "./App.tsx";
+import { AuthProvider } from "./context/AuthContext.tsx";
 
 const queryClient = new QueryClient();
 
@@ -16,7 +17,9 @@ createRoot(rootEl).render(
 	<StrictMode>
 		<BrowserRouter>
 			<QueryClientProvider client={queryClient}>
-				<App />
+				<AuthProvider>
+					<App />
+				</AuthProvider>
 			</QueryClientProvider>
 		</BrowserRouter>
 	</StrictMode>,

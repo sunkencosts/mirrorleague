@@ -65,6 +65,12 @@ export interface WeekMatchup {
 	player_points: Record<string, number>;
 }
 
+export interface AuthUser {
+	id: string;
+	email: string;
+	username: string;
+}
+
 export interface LeagueBookmark {
 	user_id: string;
 	league_id: string;

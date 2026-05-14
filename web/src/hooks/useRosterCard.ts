@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import { canFillSlot } from "../slots";
 import type { Lineup, Player, Roster, WeekMatchup } from "../types";
 import { useLineup } from "./useLineup";
@@ -23,6 +24,9 @@ export function useRosterCard({
 	weekNumber,
 }: Params) {
 	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+	const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+	const { user } = useAuth();
+	const isAuthenticated = user !== null;
 
 	const activePlayers = weekMatchup?.players ?? roster.players;
 	const activeStarters = weekMatchup?.starters ?? roster.starters;
@@ -54,7 +58,9 @@ export function useRosterCard({
 	);
 
 	const userTotal = useMemo(() => {
-		if (!weekHasScoring || !hasOverrides) return null;
+		if (!weekHasScoring || !hasOverrides) {
+			return null;
+		}
 		return activeStarters.reduce((sum, player, i) => {
 			const effective = overrides[i] ?? player;
 			return sum + (effective ? (playerPoints[effective.player_id] ?? 0) : 0);
@@ -62,9 +68,15 @@ export function useRosterCard({
 	}, [weekHasScoring, hasOverrides, activeStarters, overrides, playerPoints]);
 
 	const winner = useMemo((): "user" | "official" | "tie" | null => {
-		if (userTotal === null || officialPoints === null) return null;
-		if (userTotal > officialPoints) return "user";
-		if (officialPoints > userTotal) return "official";
+		if (userTotal === null || officialPoints === null) {
+			return null;
+		}
+		if (userTotal > officialPoints) {
+			return "user";
+		}
+		if (officialPoints > userTotal) {
+			return "official";
+		}
 		return "tie";
 	}, [userTotal, officialPoints]);
 
@@ -84,26 +96,34 @@ export function useRosterCard({
 		[bench, starterSlots],
 	);
 
-	const slotKeys = useMemo(
-		() => starterSlots.map((slot, i) => `${slot}-${i}`),
-		[starterSlots],
-	);
+	const slotKeys = useMemo(() => starterSlots.map((slot, i) => `${slot}-${i}`), [starterSlots]);
 
 	const isSaving = saveStatus === "saving";
 
 	function handleTogglePicker(i: number) {
-		if (isSaving) return;
+		if (isSaving) {
+			return;
+		}
+		if (!isAuthenticated) {
+			setShowAuthPrompt(true);
+			return;
+		}
+		setShowAuthPrompt(false);
 		setSelectedIndex((prev) => (prev === i ? null : i));
 	}
 
 	function handlePickOverride(i: number, player: Player) {
-		if (isSaving) return;
+		if (isSaving) {
+			return;
+		}
 		applyOverride(i, player);
 		setSelectedIndex(null);
 	}
 
 	function handleClearOverride(i: number) {
-		if (isSaving) return;
+		if (isSaving) {
+			return;
+		}
 		applyOverride(i, null);
 	}
 
@@ -126,6 +146,7 @@ export function useRosterCard({
 		eligiblePicksBySlot,
 		slotKeys,
 		selectedIndex,
+		showAuthPrompt,
 		handleTogglePicker,
 		handlePickOverride,
 		handleClearOverride,

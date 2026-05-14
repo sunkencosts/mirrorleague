@@ -2,10 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { bookmarksKey, deleteJson, fetchJson, patchJson } from "../api";
-import { onImageError } from "../utils/playerImage";
 import type { LeagueBookmark } from "../types";
+import { onImageError } from "../utils/playerImage";
+import { CheckIcon, PencilIcon, TrashIcon, XIcon } from "./icons";
 import styles from "./LeagueBookmarks.module.css";
-import { CheckIcon, XIcon, PencilIcon, TrashIcon } from "./icons";
 
 interface Props {
 	userId: string;
@@ -36,8 +36,19 @@ export default function LeagueBookmarks({ userId }: Props) {
 	});
 
 	const patchMutation = useMutation({
-		mutationFn: ({ leagueId, label, source }: { leagueId: string; label: string; source: string }) =>
-			patchJson<LeagueBookmark>(`/api/league-bookmarks/${leagueId}?source=${source}`, { user_id: userId, label }),
+		mutationFn: ({
+			leagueId,
+			label,
+			source,
+		}: {
+			leagueId: string;
+			label: string;
+			source: string;
+		}) =>
+			patchJson<LeagueBookmark>(`/api/league-bookmarks/${leagueId}?source=${source}`, {
+				user_id: userId,
+				label,
+			}),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: bookmarksKey(userId) });
 			setEditingId(null);
@@ -77,7 +88,8 @@ export default function LeagueBookmarks({ userId }: Props) {
 			<ul className={styles.list}>
 				{bookmarks.map((b) => {
 					const isEditing = editingId === b.league_id;
-					const isDeleting = deleteMutation.isPending && deleteMutation.variables?.leagueId === b.league_id;
+					const isDeleting =
+						deleteMutation.isPending && deleteMutation.variables?.leagueId === b.league_id;
 
 					return (
 						<li key={b.league_id}>
@@ -96,7 +108,9 @@ export default function LeagueBookmarks({ userId }: Props) {
 										className={styles.navigate}
 										onClick={() => navigate(`/league/${b.league_id}`)}
 									>
-										{b.icon_url && <img src={b.icon_url} alt="" className={styles.icon} onError={onImageError} />}
+										{b.icon_url && (
+											<img src={b.icon_url} alt="" className={styles.icon} onError={onImageError} />
+										)}
 										<span className={styles.info}>
 											<span className={styles.label}>{b.label || b.league_id}</span>
 											{b.label && <span className={styles.id}>{b.league_id}</span>}
@@ -141,7 +155,9 @@ export default function LeagueBookmarks({ userId }: Props) {
 											<button
 												type="button"
 												className={`${styles.actionBtn} ${styles.delete}`}
-												onClick={() => deleteMutation.mutate({ leagueId: b.league_id, source: b.source })}
+												onClick={() =>
+													deleteMutation.mutate({ leagueId: b.league_id, source: b.source })
+												}
 												disabled={isDeleting}
 												aria-label="Delete bookmark"
 												title="Delete bookmark"
