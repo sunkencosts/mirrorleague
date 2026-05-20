@@ -42,7 +42,7 @@ test:
 	cd api && go test ./...
 
 lint:
-	cd api && go vet ./...
+	cd api && golangci-lint run
 	cd web && npm run lint
 
 dev:

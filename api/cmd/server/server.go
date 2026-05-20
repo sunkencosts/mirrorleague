@@ -38,7 +38,11 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	if err != nil {
 		return fmt.Errorf("initializing logger: %w", err)
 	}
-	defer closeLog()
+	defer func() {
+		if err := closeLog(); err != nil {
+			fmt.Fprintf(stderr, "closing log: %v\n", err)
+		}
+	}()
 
 	dbpool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -74,12 +78,12 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 
 	srv := NewServer(sleeperClient, cfg, store, googleClient, logger)
 
-	listener, err := net.Listen("tcp", ":"+cfg.Port)
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", ":"+cfg.Port)
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
 
-	httpServer := &http.Server{Handler: srv}
+	httpServer := &http.Server{Handler: srv, ReadHeaderTimeout: 10 * time.Second}
 
 	go func() {
 		logger.Info("server listening", slog.String("addr", listener.Addr().String()))
@@ -90,7 +94,7 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func() {
+	go func() { //nolint:gosec // intentional: shutdown goroutine uses context.Background so it can outlive the cancelled parent ctx
 		defer wg.Done()
 		<-ctx.Done()
 		shutdownCtx := context.Background()

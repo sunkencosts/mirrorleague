@@ -58,7 +58,7 @@ func HandleSaveUserLeague(store userLeagueStore) http.Handler {
 			return
 		}
 		ul.IconURL = iconForSource(ul.Source)
-		encode(w, r, http.StatusOK, ul)
+		_ = encode(w, r, http.StatusOK, ul)
 	})
 }
 
@@ -78,7 +78,7 @@ func HandleListUserLeagues(store userLeagueStore) http.Handler {
 			leagues[i].IconURL = iconForSource(leagues[i].Source)
 		}
 
-		encode(w, r, http.StatusOK, leagues)
+		_ = encode(w, r, http.StatusOK, leagues)
 	})
 }
 
@@ -109,7 +109,7 @@ func HandleUpdateUserLeague(store userLeagueStore) http.Handler {
 			return
 		}
 		ul.IconURL = iconForSource(ul.Source)
-		encode(w, r, http.StatusOK, ul)
+		_ = encode(w, r, http.StatusOK, ul)
 	})
 }
 

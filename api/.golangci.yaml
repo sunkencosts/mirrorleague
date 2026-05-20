@@ -2,6 +2,18 @@ version: "2"
 
 linters:
   default: standard
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - noctx
+          - errcheck
+          - bodyclose
+          - gosec
+      - linters: [errcheck]
+        text: "Error return value of `.*\\.Body\\.Close` is not checked"
+      - linters: [errcheck]
+        text: "Error return value of `fmt\\.Fprint"
   enable:
     - bodyclose   # HTTP response bodies are closed
     - gosec       # security checks (auth, crypto, HTTP)

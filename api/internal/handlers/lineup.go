@@ -65,7 +65,7 @@ func HandleCreateLineup(store lineupStore, p lineupMatchupProvider) http.Handler
 			return
 		}
 		w.Header().Set("Location", "/api/lineups/"+lineup.ID)
-		encode(w, r, http.StatusCreated, lineup)
+		_ = encode(w, r, http.StatusCreated, lineup)
 	})
 }
 
@@ -113,7 +113,7 @@ func HandleUpdateLineup(store lineupStore, p lineupMatchupProvider) http.Handler
 			http.Error(w, "failed to update lineup", http.StatusInternalServerError)
 			return
 		}
-		encode(w, r, http.StatusOK, lineup)
+		_ = encode(w, r, http.StatusOK, lineup)
 	})
 }
 
@@ -150,7 +150,7 @@ func HandleListLineups(store lineupStore) http.Handler {
 			http.Error(w, "failed to list lineups", http.StatusInternalServerError)
 			return
 		}
-		encode(w, r, http.StatusOK, lineups)
+		_ = encode(w, r, http.StatusOK, lineups)
 	})
 }
 func HandleGetLineupByID(store lineupStore) http.Handler {
@@ -169,7 +169,7 @@ func HandleGetLineupByID(store lineupStore) http.Handler {
 			http.Error(w, "failed to get lineup", http.StatusInternalServerError)
 			return
 		}
-		encode(w, r, http.StatusOK, lineup)
+		_ = encode(w, r, http.StatusOK, lineup)
 	})
 }
 func validateStarters(ctx context.Context, p lineupMatchupProvider, leagueID string, rosterID, week int, starters []string) error {

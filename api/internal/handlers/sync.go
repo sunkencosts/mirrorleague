@@ -61,7 +61,7 @@ func HandleSyncPlayers(store playerSyncer, invalidator rosterInvalidator, sleepe
 		}
 		invalidator.InvalidateRosters()
 
-		encode(w, r, http.StatusOK, map[string]int{"upserted": len(players)})
+		_ = encode(w, r, http.StatusOK, map[string]int{"upserted": len(players)})
 	})
 }
 

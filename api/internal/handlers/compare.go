@@ -117,7 +117,7 @@ func HandleGetCompare(matchups compareMatchupProvider, store compareLineupStore)
 			winner = winnerUser
 		}
 
-		encode(w, r, http.StatusOK, provider.CompareResponse{
+		_ = encode(w, r, http.StatusOK, provider.CompareResponse{
 			RosterID: rosterID,
 			Week:     week,
 			Official: provider.ScoredLineup{

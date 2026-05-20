@@ -55,7 +55,7 @@ func (s *Store) UpsertPlayers(ctx context.Context, players []provider.Player) er
 			player.PlayerID, player.FirstName, player.LastName, player.Team, player.Active, player.FantasyPositions, player.Number, player.Age, player.Rarity)
 	}
 	results := s.pool.SendBatch(ctx, batch)
-	defer results.Close()
+	defer func() { _ = results.Close() }()
 
 	for _, player := range players {
 		if _, err := results.Exec(); err != nil {
@@ -295,7 +295,7 @@ func (s *Store) MergeAnonymousData(ctx context.Context, anonymousID, userID stri
 	if err != nil {
 		return fmt.Errorf("beginning merge transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	_, err = tx.Exec(ctx, `
 		WITH moved AS (

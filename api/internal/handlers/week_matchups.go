@@ -24,6 +24,6 @@ func HandleGetWeekMatchups(p weekMatchupProvider) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		encode(w, r, http.StatusOK, matchups)
+		_ = encode(w, r, http.StatusOK, matchups)
 	})
 }

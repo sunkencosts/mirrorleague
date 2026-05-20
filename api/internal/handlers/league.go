@@ -19,6 +19,6 @@ func HandleGetLeague(p leagueProvider) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		encode(w, r, http.StatusOK, league)
+		_ = encode(w, r, http.StatusOK, league)
 	})
 }

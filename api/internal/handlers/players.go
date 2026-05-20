@@ -18,6 +18,6 @@ func HandleGetPlayers(s playerStore) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		encode(w, r, http.StatusOK, players)
+		_ = encode(w, r, http.StatusOK, players)
 	})
 }

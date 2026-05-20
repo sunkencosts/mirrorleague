@@ -13,9 +13,15 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: migrate <up|down|version>")
+	if err := runMigrate(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+}
+
+func runMigrate() error {
+	if len(os.Args) < 2 {
+		return fmt.Errorf("usage: migrate <up|down|version>")
 	}
 
 	cfg := config.Load(os.Getenv)
@@ -25,37 +31,33 @@ func main() {
 
 	m, err := migrate.New(cfg.MigrationsURL, migrateURL)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "creating migrator: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("creating migrator: %w", err)
 	}
-	defer m.Close()
+	defer func() { _, _ = m.Close() }()
 
 	switch os.Args[1] {
 	case "up":
 		if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-			fmt.Fprintf(os.Stderr, "migrate up: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("migrate up: %w", err)
 		}
-		fmt.Println("migrations applied")
+		fmt.Fprintln(os.Stdout, "migrations applied")
 	case "down":
 		if err := m.Steps(-1); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-			fmt.Fprintf(os.Stderr, "migrate down: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("migrate down: %w", err)
 		}
-		fmt.Println("rolled back one migration")
+		fmt.Fprintln(os.Stdout, "rolled back one migration")
 	case "version":
 		v, dirty, err := m.Version()
 		if errors.Is(err, migrate.ErrNilVersion) {
-			fmt.Println("version: none")
-			return
+			fmt.Fprintln(os.Stdout, "version: none")
+			return nil
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "version: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("version: %w", err)
 		}
-		fmt.Printf("version: %d, dirty: %v\n", v, dirty)
+		fmt.Fprintf(os.Stdout, "version: %d, dirty: %v\n", v, dirty)
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
-		os.Exit(1)
+		return fmt.Errorf("unknown command: %s", os.Args[1])
 	}
+	return nil
 }

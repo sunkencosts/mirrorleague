@@ -19,6 +19,6 @@ func HandleGetRosters(p rosterProvider) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		encode(w, r, http.StatusOK, rosters)
+		_ = encode(w, r, http.StatusOK, rosters)
 	})
 }

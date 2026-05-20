@@ -28,7 +28,7 @@ func Load(getenv func(string) string) Config {
 	}
 	databaseURL := getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = "postgres://mirrorme:mirrorme@localhost:5433/mirrorme"
+		databaseURL = "postgres://mirrorme:mirrorme@localhost:5433/mirrorme" //nolint:gosec
 	}
 	sleeperBaseURL := getenv("SLEEPER_BASE_URL")
 	if sleeperBaseURL == "" {
@@ -54,7 +54,7 @@ func Load(getenv func(string) string) Config {
 	}
 	googleTokenURL := getenv("GOOGLE_TOKEN_URL")
 	if googleTokenURL == "" {
-		googleTokenURL = "https://oauth2.googleapis.com/token"
+		googleTokenURL = "https://oauth2.googleapis.com/token" //nolint:gosec
 	}
 	googleUserInfoURL := getenv("GOOGLE_USERINFO_URL")
 	if googleUserInfoURL == "" {

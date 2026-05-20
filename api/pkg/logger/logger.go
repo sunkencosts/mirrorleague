@@ -66,7 +66,7 @@ func New(env, logFile string, stdout, stderr io.Writer) (*slog.Logger, CloseFunc
 		cleanup := noop
 
 		if logFile != "" {
-			f, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+			f, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600) //nolint:gosec
 			if err != nil {
 				return nil, nil, fmt.Errorf("opening log file: %w", err)
 			}
