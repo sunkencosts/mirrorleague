@@ -1,0 +1,24 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose   # HTTP response bodies are closed
+    - gosec       # security checks (auth, crypto, HTTP)
+    - gocritic    # style and correctness suggestions
+    - misspell    # catch typos in comments and strings
+    - noctx       # HTTP requests made without context
+    - forbidigo
+  settings:
+    forbidigo:
+      forbid:
+        - pattern: ^fmt\.Print.*$
+          msg: Use logger instead.
+      analyze-types: true
+    gosec:
+      excludes:
+        - G104 # unhandled errors — already covered by errcheck
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

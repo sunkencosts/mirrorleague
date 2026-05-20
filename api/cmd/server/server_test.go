@@ -1092,9 +1092,9 @@ func compareSleeperHandler() http.Handler {
 			json.NewEncoder(w).Encode([]map[string]any{
 				{
 					"roster_id": 1, "matchup_id": 5,
-					"players":  []string{"111", "222", "333"},
-					"starters": []string{"111", "222"},
-					"points":   30.5,
+					"players":        []string{"111", "222", "333"},
+					"starters":       []string{"111", "222"},
+					"points":         30.5,
 					"players_points": map[string]float64{"111": 22.4, "222": 8.1, "333": 15.0},
 				},
 			})
@@ -1462,5 +1462,26 @@ func TestGetPlayers(t *testing.T) {
 		if p.ImageURL == "" {
 			t.Errorf("player %s has empty image_url", p.PlayerID)
 		}
+	}
+}
+
+func TestResponseWriter_DefaultsTo200(t *testing.T) {
+	rec := httptest.NewRecorder()
+	rw := newResponseWriter(rec)
+	rw.Write([]byte("ok"))
+	if rw.status != http.StatusOK {
+		t.Errorf("want 200, got %d", rw.status)
+	}
+}
+
+func TestResponseWriter_CapturesStatus(t *testing.T) {
+	rec := httptest.NewRecorder()
+	rw := newResponseWriter(rec)
+	rw.WriteHeader(http.StatusNotFound)
+	if rw.status != http.StatusNotFound {
+		t.Errorf("want 404, got %d", rw.status)
+	}
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("underlying writer not called: want 404, got %d", rec.Code)
 	}
 }

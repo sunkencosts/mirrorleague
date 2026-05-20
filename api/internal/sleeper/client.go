@@ -59,9 +59,9 @@ type matchupEntry struct {
 }
 
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
-	players    playerLookup
+	baseURL     string
+	httpClient  *http.Client
+	players     playerLookup
 	currentWeek int
 
 	rosterMu    sync.RWMutex

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -21,6 +21,7 @@ import (
 	"github.com/sunkencosts/mirror-me/internal/googleauth"
 	"github.com/sunkencosts/mirror-me/internal/sleeper"
 	"github.com/sunkencosts/mirror-me/pkg/config"
+	"github.com/sunkencosts/mirror-me/pkg/logger"
 )
 
 func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writer) error {
@@ -33,6 +34,12 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 		return fmt.Errorf("JWT_SECRET must be set")
 	}
 
+	logger, closeLog, err := logger.New(cfg.AppEnv, cfg.LogFile, stdout, stderr)
+	if err != nil {
+		return fmt.Errorf("initializing logger: %w", err)
+	}
+	defer closeLog()
+
 	dbpool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("creating connection pool: %w", err)
@@ -43,7 +50,8 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	if err := store.Ping(ctx); err != nil {
 		return fmt.Errorf("pinging database: %w", err)
 	}
-	log.Println("database connected")
+	logger.Info("database connected")
+
 	sleeperClient := sleeper.New(cfg.SleeperBaseURL, store, cfg.CurrentWeek)
 	googleClient := googleauth.New(googleauth.Config{
 		ClientID:     cfg.GoogleClientID,
@@ -63,7 +71,8 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("running migrations: %w", err)
 	}
-	srv := NewServer(sleeperClient, cfg, store, googleClient)
+
+	srv := NewServer(sleeperClient, cfg, store, googleClient, logger)
 
 	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
@@ -73,9 +82,9 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	httpServer := &http.Server{Handler: srv}
 
 	go func() {
-		fmt.Fprintf(stdout, "listening on %s\n", listener.Addr())
+		logger.Info("server listening", slog.String("addr", listener.Addr().String()))
 		if err := httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
-			fmt.Fprintf(stderr, "error listening and serving: %s\n", err)
+			logger.Error("server error", slog.Any("err", err))
 		}
 	}()
 
@@ -88,19 +97,20 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 		shutdownCtx, cancel := context.WithTimeout(shutdownCtx, 10*time.Second)
 		defer cancel()
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			fmt.Fprintf(stderr, "error shutting down http server: %s\n", err)
+			logger.Error("shutdown error", slog.Any("err", err))
 		}
 	}()
 	wg.Wait()
 	return nil
 }
 
-func NewServer(sleeperClient sleeperDeps, cfg config.Config, store *db.Store, googleClient *googleauth.Client) http.Handler {
+func NewServer(sleeperClient sleeperDeps, cfg config.Config, store *db.Store, googleClient *googleauth.Client, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 	addRoutes(mux, sleeperClient, store, cfg, googleClient)
 
 	var handler http.Handler = mux
 	handler = corsMiddleware(cfg.FrontendURL)(handler)
+	handler = requestLogger(logger)(handler)
 	return handler
 }
 
@@ -118,6 +128,36 @@ func corsMiddleware(frontendURL string) func(http.Handler) http.Handler {
 				return
 			}
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func newResponseWriter(w http.ResponseWriter) *responseWriter {
+	return &responseWriter{w, http.StatusOK}
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			rw := newResponseWriter(w)
+			start := time.Now()
+			next.ServeHTTP(rw, r)
+			logger.Info("request",
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.Int("status", rw.status),
+				slog.Duration("duration", time.Since(start)),
+			)
 		})
 	}
 }
