@@ -101,7 +101,9 @@ export function useLineup({
 				// lineupFirstAppeared and overwriting picks made before the query lands.
 				setState((prev) => ({ ...prev, lineupId: data.id }));
 			}
-			queryClient.invalidateQueries({ queryKey });
+			queryClient.setQueryData(queryKey, (old: Lineup[] | undefined) =>
+				old ? old.map((l) => (l.id === data.id ? data : l)) : [data],
+			);
 		},
 	});
 
