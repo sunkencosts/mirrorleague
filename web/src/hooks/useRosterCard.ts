@@ -4,6 +4,9 @@ import { canFillSlot } from "../slots";
 import type { Lineup, Player, Roster, WeekMatchup } from "../types";
 import { useLineup } from "./useLineup";
 
+const POSITION_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5, DST: 5 };
+const EMPTY_PLAYERS: Player[] = [];
+
 interface Params {
 	roster: Roster;
 	weekMatchup?: WeekMatchup | null;
@@ -12,6 +15,7 @@ interface Params {
 	userId: string;
 	leagueId: string;
 	weekNumber: number;
+	currentWeek: number;
 }
 
 export function useRosterCard({
@@ -22,6 +26,7 @@ export function useRosterCard({
 	userId,
 	leagueId,
 	weekNumber,
+	currentWeek,
 }: Params) {
 	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 	const [showAuthPrompt, setShowAuthPrompt] = useState(false);
@@ -30,6 +35,11 @@ export function useRosterCard({
 
 	const activePlayers = weekMatchup?.players ?? roster.players;
 	const activeStarters = weekMatchup?.starters ?? roster.starters;
+
+	// Sleeper provides no historical IR/taxi data — only show them for the current week.
+	const isCurrentWeek = weekNumber === currentWeek;
+	const activeReserve = isCurrentWeek ? roster.reserve : EMPTY_PLAYERS;
+	const activeTaxi = isCurrentWeek ? roster.taxi : EMPTY_PLAYERS;
 
 	const existingLineup = useMemo(
 		() => lineups.find((l) => l.roster_id === roster.roster_id) ?? null,
@@ -88,8 +98,16 @@ export function useRosterCard({
 	const bench = useMemo(() => {
 		const officialIds = new Set(activeStarters.map((p) => p.player_id));
 		const usedIds = new Set(Object.values(overrides).map((p) => p.player_id));
-		return activePlayers.filter((p) => !officialIds.has(p.player_id) && !usedIds.has(p.player_id));
-	}, [activePlayers, activeStarters, overrides]);
+		const taxiIds = new Set(activeTaxi.map((p) => p.player_id));
+		const reserveIds = new Set(activeReserve.map((p) => p.player_id));
+		return activePlayers
+			.filter((p) => !officialIds.has(p.player_id) && !usedIds.has(p.player_id) && !taxiIds.has(p.player_id) && !reserveIds.has(p.player_id))
+			.sort((a, b) => {
+				const aPos = POSITION_ORDER[a.fantasy_positions[0]] ?? 99;
+				const bPos = POSITION_ORDER[b.fantasy_positions[0]] ?? 99;
+				return aPos - bPos;
+			});
+	}, [activePlayers, activeReserve, activeTaxi, activeStarters, overrides]);
 
 	const eligiblePicksBySlot = useMemo(
 		() => starterSlots.map((slot) => bench.filter((p) => canFillSlot(slot, p))),
@@ -134,6 +152,8 @@ export function useRosterCard({
 	return {
 		activePlayers,
 		activeStarters,
+		activeReserve,
+		activeTaxi,
 		playerPoints,
 		weekHasScoring,
 		officialPoints,

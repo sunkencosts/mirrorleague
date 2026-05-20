@@ -149,6 +149,7 @@ export default function LeaguePage() {
 							userId={userId}
 							lineups={lineups}
 							weekNumber={weekNumber}
+							currentWeek={league.settings.leg}
 						/>
 					</div>
 				))}

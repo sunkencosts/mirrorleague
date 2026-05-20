@@ -37,6 +37,7 @@ export interface League {
 		reserve_slots: number;
 		taxi_slots: number;
 		num_teams: number;
+		leg: number;
 	};
 }
 

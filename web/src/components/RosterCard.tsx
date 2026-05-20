@@ -16,6 +16,7 @@ interface Props {
 	allScores: number[];
 	leagueId: string;
 	weekNumber: number;
+	currentWeek: number;
 	userId: string;
 	lineups: Lineup[];
 }
@@ -127,12 +128,15 @@ export default function RosterCard({
 	allScores,
 	leagueId,
 	weekNumber,
+	currentWeek,
 	userId,
 	lineups,
 }: Props) {
 	const {
 		activePlayers,
 		activeStarters,
+		activeReserve,
+		activeTaxi,
 		playerPoints,
 		weekHasScoring,
 		officialPoints,
@@ -150,7 +154,7 @@ export default function RosterCard({
 		handlePickOverride,
 		handleClearOverride,
 		handleCloseAllPickers,
-	} = useRosterCard({ roster, weekMatchup, starterSlots, lineups, userId, leagueId, weekNumber });
+	} = useRosterCard({ roster, weekMatchup, starterSlots, lineups, userId, leagueId, weekNumber, currentWeek });
 
 	function getPoints(playerId: string) {
 		return weekHasScoring ? (playerPoints[playerId] ?? 0) : undefined;
@@ -250,13 +254,13 @@ export default function RosterCard({
 				</div>
 			</div>
 
-			{irSlots > 0 && (
+			{irSlots > 0 && activeReserve.length > 0 && (
 				<div className={styles.section}>
 					<h3 className={styles.sectionLabel}>
-						IR · {roster.reserve.length}/{irSlots}
+						IR · {activeReserve.length}/{irSlots}
 					</h3>
 					<div className={styles.playerList}>
-						{roster.reserve.map((player) => (
+						{activeReserve.map((player) => (
 							<PlayerCard
 								key={player.player_id}
 								player={player}
@@ -267,13 +271,13 @@ export default function RosterCard({
 				</div>
 			)}
 
-			{taxiSlots > 0 && (
+			{taxiSlots > 0 && activeTaxi.length > 0 && (
 				<div className={styles.section}>
 					<h3 className={styles.sectionLabel}>
-						Taxi · {roster.taxi.length}/{taxiSlots}
+						Taxi · {activeTaxi.length}/{taxiSlots}
 					</h3>
 					<div className={styles.playerList}>
-						{roster.taxi.map((player) => (
+						{activeTaxi.map((player) => (
 							<PlayerCard
 								key={player.player_id}
 								player={player}
