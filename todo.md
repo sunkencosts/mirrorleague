@@ -1,5 +1,6 @@
 # Next
 # FE
+- sleeper doesn't provide historical data for taxi and IR. So make sure testing and app in general doesn't revolve around that.
 -
 - Use sleeper historical data to test.
 - search for a player

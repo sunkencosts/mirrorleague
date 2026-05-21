@@ -6,6 +6,7 @@ import LeagueSummary from "../components/LeagueSummary";
 import PlayerSearch from "../components/PlayerSearch";
 import RosterCard from "../components/RosterCard";
 import { useAuth } from "../context/AuthContext";
+import { useDismissed } from "../hooks/useDismissed";
 import { computePowerScore } from "../scoring";
 import type { League, LeagueBookmark, LeagueConfig, Lineup, Roster, WeekMatchup } from "../types";
 import styles from "./LeaguePage.module.css";
@@ -105,6 +106,31 @@ export default function LeaguePage() {
 		[rosters],
 	);
 
+	const [dismissedToEnd, setDismissedToEnd] = useDismissed(leagueId);
+
+	const dismissedSet = useMemo(() => new Set(dismissedToEnd), [dismissedToEnd]);
+
+	const activeRosters = useMemo(
+		() => rosters.filter((r) => !dismissedSet.has(r.roster_id)),
+		[rosters, dismissedSet],
+	);
+
+	const rosterById = useMemo(
+		() => new Map(rosters.map((r) => [r.roster_id, r])),
+		[rosters],
+	);
+
+	const dismissedRosters = useMemo(
+		() => dismissedToEnd.map((id) => rosterById.get(id)).filter((r): r is Roster => r !== undefined),
+		[dismissedToEnd, rosterById],
+	);
+
+	function handleToggleDismiss(rosterId: number) {
+		setDismissedToEnd((prev) =>
+			prev.includes(rosterId) ? prev.filter((id) => id !== rosterId) : [...prev, rosterId],
+		);
+	}
+
 	const error = leagueError ?? rostersError;
 	if (leagueLoading || rostersLoading) {
 		return <p>Loading…</p>;
@@ -118,6 +144,26 @@ export default function LeaguePage() {
 	}
 	if (!leagueConfig || !league) {
 		return null;
+	}
+
+	function renderCard(roster: Roster, isDismissed: boolean) {
+		return (
+			<div key={roster.roster_id} id={`roster-${roster.roster_id}`} className={styles.rosterWrapper}>
+				<RosterCard
+					roster={roster}
+					weekMatchup={matchupByRosterId.get(roster.roster_id) ?? null}
+					{...leagueConfig}
+					allScores={allScores}
+					leagueId={leagueId}
+					userId={userId}
+					lineups={lineups}
+					weekNumber={weekNumber}
+					currentWeek={league.settings.leg}
+					isDismissed={isDismissed}
+					onToggleDismiss={() => handleToggleDismiss(roster.roster_id)}
+				/>
+			</div>
+		);
 	}
 
 	function scrollToRoster(rosterId: number) {
@@ -136,24 +182,32 @@ export default function LeaguePage() {
 				weekNumber={weekNumber}
 				onWeekChange={(w) => navigate(`/league/${leagueId}/week/${w}`)}
 			/>
-			<PlayerSearch rosters={rosters} onScrollToRoster={scrollToRoster} />
-			<div className={styles.rosterList}>
-				{rosters.map((roster) => (
-					<div key={roster.roster_id} id={`roster-${roster.roster_id}`} className={styles.rosterWrapper}>
-						<RosterCard
-							roster={roster}
-							weekMatchup={matchupByRosterId.get(roster.roster_id) ?? null}
-							{...leagueConfig}
-							allScores={allScores}
-							leagueId={leagueId}
-							userId={userId}
-							lineups={lineups}
-							weekNumber={weekNumber}
-							currentWeek={league.settings.leg}
-						/>
-					</div>
-				))}
+			<div className={styles.controls}>
+				<PlayerSearch rosters={rosters} onScrollToRoster={scrollToRoster} />
+				<select
+					className={styles.teamSelect}
+					value=""
+					onChange={(e) => {
+						const id = Number(e.target.value);
+						if (id) scrollToRoster(id);
+					}}
+				>
+					<option value="" disabled>Jump to team…</option>
+					{[...activeRosters, ...dismissedRosters].map((r) => (
+						<option key={r.roster_id} value={r.roster_id}>
+							{r.team_name || `Team ${r.roster_id}`}
+						</option>
+					))}
+				</select>
 			</div>
+			<div className={styles.rosterList}>
+				{activeRosters.map((roster) => renderCard(roster, false))}
+			</div>
+			{dismissedRosters.length > 0 && (
+				<div className={styles.dismissedList}>
+					{dismissedRosters.map((roster) => renderCard(roster, true))}
+				</div>
+			)}
 		</>
 	);
 }

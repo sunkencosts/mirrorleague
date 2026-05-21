@@ -98,8 +98,8 @@ export function useRosterCard({
 	const bench = useMemo(() => {
 		const officialIds = new Set(activeStarters.map((p) => p.player_id));
 		const usedIds = new Set(Object.values(overrides).map((p) => p.player_id));
-		const taxiIds = new Set(activeTaxi.map((p) => p.player_id));
-		const reserveIds = new Set(activeReserve.map((p) => p.player_id));
+		const taxiIds = new Set(roster.taxi.map((p) => p.player_id));
+		const reserveIds = new Set(roster.reserve.map((p) => p.player_id));
 		return activePlayers
 			.filter((p) => !officialIds.has(p.player_id) && !usedIds.has(p.player_id) && !taxiIds.has(p.player_id) && !reserveIds.has(p.player_id))
 			.sort((a, b) => {
@@ -107,7 +107,7 @@ export function useRosterCard({
 				const bPos = POSITION_ORDER[b.fantasy_positions[0]] ?? 99;
 				return aPos - bPos;
 			});
-	}, [activePlayers, activeReserve, activeTaxi, activeStarters, overrides]);
+	}, [activePlayers, roster.reserve, roster.taxi, activeStarters, overrides]);
 
 	const eligiblePicksBySlot = useMemo(
 		() => starterSlots.map((slot) => bench.filter((p) => canFillSlot(slot, p))),

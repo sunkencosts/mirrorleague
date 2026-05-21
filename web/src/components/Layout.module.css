@@ -4,6 +4,13 @@
  * When that happens, move max-width off .shell and onto .header/.content
  * inner wrappers so the nav can span the full viewport.
  */
+
+/* Grid children default to min-width: auto which lets content push them wider
+   than the viewport. min-width: 0 restores normal overflow behaviour. */
+.content {
+	min-width: 0;
+}
+
 .shell {
 	display: grid;
 	grid-template-rows: auto 1fr;

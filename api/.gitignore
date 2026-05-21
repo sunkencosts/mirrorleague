@@ -1,3 +1,4 @@
 players.json
 rankings.json
 .env
+*.log
