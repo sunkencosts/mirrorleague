@@ -42,3 +42,9 @@
 	opacity: 0.5;
 	cursor: not-allowed;
 }
+
+.error {
+	color: var(--error, #e53e3e);
+	font-size: 0.875rem;
+	margin: 0;
+}

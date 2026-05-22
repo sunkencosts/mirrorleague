@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/sunkencosts/mirror-me/internal/provider"
@@ -16,6 +17,10 @@ func HandleGetLeague(p leagueProvider) http.Handler {
 		leagueID := r.PathValue("leagueId")
 		league, err := p.GetLeague(r.Context(), leagueID)
 		if err != nil {
+			if errors.Is(err, provider.ErrLeagueNotFound) {
+				http.Error(w, "league not found", http.StatusNotFound)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

@@ -654,8 +654,9 @@ func TestGetLeague(t *testing.T) {
 	baseURL := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/league/abc" {
 			json.NewEncoder(w).Encode(map[string]any{
-				"name":   "Test League",
-				"season": "2025",
+				"league_id": "abc",
+				"name":      "Test League",
+				"season":    "2025",
 			})
 		}
 	}))
@@ -675,6 +676,27 @@ func TestGetLeague(t *testing.T) {
 	}
 	if league.Name != "Test League" || league.Season != "2025" {
 		t.Errorf("unexpected league: %+v", league)
+	}
+}
+
+func TestGetLeagueNotFound(t *testing.T) {
+	baseURL := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/league/bad-id" {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, "null")
+			return
+		}
+		http.NotFound(w, r)
+	}))
+
+	resp, err := http.Get(baseURL + "/api/league/bad-id")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
 	}
 }
 

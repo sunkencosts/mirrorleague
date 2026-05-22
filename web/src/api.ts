@@ -1,7 +1,16 @@
+export class ApiError extends Error {
+	status: number;
+	constructor(status: number, message: string) {
+		super(message);
+		this.name = "ApiError";
+		this.status = status;
+	}
+}
+
 export async function fetchJson<T>(url: string): Promise<T> {
 	const r = await fetch(url);
 	if (!r.ok) {
-		throw new Error(`${r.status} ${r.statusText}`);
+		throw new ApiError(r.status, `${r.status} ${r.statusText}`);
 	}
 	return r.json();
 }
@@ -13,7 +22,7 @@ async function mutateJson<T>(method: string, url: string, body: unknown): Promis
 		body: JSON.stringify(body),
 	});
 	if (!r.ok) {
-		throw new Error(`${r.status} ${r.statusText}`);
+		throw new ApiError(r.status, `${r.status} ${r.statusText}`);
 	}
 	if (r.status === 204) {
 		return undefined as T;
@@ -32,7 +41,7 @@ export function patchJson<T>(url: string, body: unknown): Promise<T> {
 export async function deleteJson(url: string): Promise<void> {
 	const r = await fetch(url, { method: "DELETE" });
 	if (!r.ok) {
-		throw new Error(`${r.status} ${r.statusText}`);
+		throw new ApiError(r.status, `${r.status} ${r.statusText}`);
 	}
 }
 

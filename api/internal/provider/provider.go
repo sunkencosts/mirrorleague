@@ -7,6 +7,7 @@ import (
 )
 
 var ErrUsernameConflict = errors.New("username already taken")
+var ErrLeagueNotFound = errors.New("league not found")
 
 type User struct {
 	UserID      string `json:"user_id"`

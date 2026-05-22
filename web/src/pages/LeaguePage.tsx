@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
-import { bookmarksKey, fetchJson, patchJson } from "../api";
+import { type ApiError, bookmarksKey, fetchJson, patchJson } from "../api";
 import LeagueSummary from "../components/LeagueSummary";
 import PlayerSearch from "../components/PlayerSearch";
 import RosterCard from "../components/RosterCard";
@@ -18,24 +18,29 @@ export default function LeaguePage() {
 	const { userId } = useAuth();
 	const queryClient = useQueryClient();
 
+	const leagueQueryKey = ["league", leagueId] as const;
+
 	const {
 		data: league,
 		isLoading: leagueLoading,
-		error: leagueError,
 	} = useQuery<League>({
-		queryKey: ["league", leagueId],
+		queryKey: leagueQueryKey,
 		queryFn: () => fetchJson(`/api/league/${leagueId}`),
 		enabled: !!leagueId,
+		retry: (count, error) => count < 3 && (error as ApiError)?.status !== 404,
+		throwOnError: true,
 	});
 
 	const {
 		data: rosters = [],
 		isLoading: rostersLoading,
-		error: rostersError,
 	} = useQuery<Roster[]>({
 		queryKey: ["rosters", leagueId],
 		queryFn: () => fetchJson(`/api/league/${leagueId}/rosters`),
+		select: (data) => data ?? [],
 		enabled: !!leagueId,
+		retry: (count, error) => count < 3 && (error as ApiError)?.status !== 404,
+		throwOnError: true,
 	});
 
 	const { data: weekMatchups = [] } = useQuery<WeekMatchup[]>({
@@ -131,16 +136,8 @@ export default function LeaguePage() {
 		);
 	}
 
-	const error = leagueError ?? rostersError;
 	if (leagueLoading || rostersLoading) {
 		return <p>Loading…</p>;
-	}
-	if (error) {
-		return (
-			<p className={styles.error}>
-				{error instanceof Error ? error.message : "Something went wrong"}
-			</p>
-		);
 	}
 	if (!leagueConfig || !league) {
 		return null;

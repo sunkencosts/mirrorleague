@@ -2,8 +2,8 @@ import "./index.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router";
-import App from "./App.tsx";
+import { RouterProvider } from "react-router";
+import { router } from "./App.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 
 const queryClient = new QueryClient();
@@ -15,12 +15,10 @@ if (!rootEl) {
 
 createRoot(rootEl).render(
 	<StrictMode>
-		<BrowserRouter>
-			<QueryClientProvider client={queryClient}>
-				<AuthProvider>
-					<App />
-				</AuthProvider>
-			</QueryClientProvider>
-		</BrowserRouter>
+		<QueryClientProvider client={queryClient}>
+			<AuthProvider>
+				<RouterProvider router={router} />
+			</AuthProvider>
+		</QueryClientProvider>
 	</StrictMode>,
 );

@@ -142,7 +142,6 @@ func (c *Client) getLeagueUsers(ctx context.Context, leagueID string) (map[strin
 }
 func (c *Client) GetLeague(ctx context.Context, leagueID string) (provider.League, error) {
 	url := c.baseURL + "/league/" + leagueID
-	var leagueSettings provider.League
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -153,10 +152,22 @@ func (c *Client) GetLeague(ctx context.Context, leagueID string) (provider.Leagu
 		return provider.League{}, fmt.Errorf("getting league for leagueID %s: %w", leagueID, err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return provider.League{}, provider.ErrLeagueNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return provider.League{}, fmt.Errorf("sleeper returned status %d for league %s", resp.StatusCode, leagueID)
+	}
+
+	var leagueSettings *provider.League
 	if err := json.NewDecoder(resp.Body).Decode(&leagueSettings); err != nil {
 		return provider.League{}, fmt.Errorf("decoding league: %w", err)
 	}
-	return leagueSettings, nil
+	if leagueSettings == nil || leagueSettings.LeagueID == "" {
+		return provider.League{}, provider.ErrLeagueNotFound
+	}
+	return *leagueSettings, nil
 }
 
 func (c *Client) GetRosters(ctx context.Context, leagueID string) ([]provider.Roster, error) {
