@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
-import { type ApiError, bookmarksKey, fetchJson, patchJson } from "../api";
+import { bookmarksKey, fetchJson, patchJson } from "../api";
 import LeagueSummary from "../components/LeagueSummary";
 import PlayerSearch from "../components/PlayerSearch";
 import RosterCard from "../components/RosterCard";
@@ -27,7 +27,6 @@ export default function LeaguePage() {
 		queryKey: leagueQueryKey,
 		queryFn: () => fetchJson(`/api/league/${leagueId}`),
 		enabled: !!leagueId,
-		retry: (count, error) => count < 3 && (error as ApiError)?.status !== 404,
 		throwOnError: true,
 	});
 
@@ -39,7 +38,6 @@ export default function LeaguePage() {
 		queryFn: () => fetchJson(`/api/league/${leagueId}/rosters`),
 		select: (data) => data ?? [],
 		enabled: !!leagueId,
-		retry: (count, error) => count < 3 && (error as ApiError)?.status !== 404,
 		throwOnError: true,
 	});
 
@@ -78,7 +76,7 @@ export default function LeaguePage() {
 	});
 
 	const patched = useRef(false);
-	const highlightTimer = useRef<ReturnType<typeof setTimeout>>();
+	const highlightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	useEffect(() => () => clearTimeout(highlightTimer.current), []);
 
 	useEffect(() => {
@@ -149,13 +147,13 @@ export default function LeaguePage() {
 				<RosterCard
 					roster={roster}
 					weekMatchup={matchupByRosterId.get(roster.roster_id) ?? null}
-					{...leagueConfig}
+					{...(leagueConfig as LeagueConfig)}
 					allScores={allScores}
 					leagueId={leagueId}
 					userId={userId}
 					lineups={lineups}
 					weekNumber={weekNumber}
-					currentWeek={league.settings.leg}
+					currentWeek={league!.settings.leg}
 					isDismissed={isDismissed}
 					onToggleDismiss={() => handleToggleDismiss(roster.roster_id)}
 				/>

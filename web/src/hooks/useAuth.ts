@@ -17,7 +17,6 @@ export function useAuthState() {
 			return resp.json() as Promise<AuthUser>;
 		},
 		staleTime: 5 * 60 * 1000,
-		retry: false,
 	});
 
 	useEffect(() => {

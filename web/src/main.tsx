@@ -5,8 +5,18 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { router } from "./App.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
+import { ApiError } from "./api.ts";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+	defaultOptions: {
+		queries: {
+			retry: (count, error) => {
+				if (error instanceof ApiError && error.status < 500) return false;
+				return count < 3;
+			},
+		},
+	},
+});
 
 const rootEl = document.getElementById("root");
 if (!rootEl) {
