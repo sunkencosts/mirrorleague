@@ -28,7 +28,7 @@ func Load(getenv func(string) string) Config {
 	}
 	databaseURL := getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = "postgres://mirrorme:mirrorme@localhost:5433/mirrorme" //nolint:gosec
+		databaseURL = "postgres://mirrorleague:mirrorleague@localhost:5433/mirrorleague" //nolint:gosec
 	}
 	sleeperBaseURL := getenv("SLEEPER_BASE_URL")
 	if sleeperBaseURL == "" {

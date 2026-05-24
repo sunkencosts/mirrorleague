@@ -1,1 +1,2 @@
-CREATE DATABASE mirrorme_test;
+CREATE DATABASE mirrorleague_test;
+

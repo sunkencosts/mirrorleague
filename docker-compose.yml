@@ -2,9 +2,9 @@ services:
   db:
     image: postgres:17
     environment: 
-      POSTGRES_USER: mirrorme
-      POSTGRES_PASSWORD: mirrorme
-      POSTGRES_DB: mirrorme
+      POSTGRES_USER: mirrorleague
+      POSTGRES_PASSWORD: mirrorleague
+      POSTGRES_DB: mirrorleague
     ports:
       - "5433:5432"
     volumes:

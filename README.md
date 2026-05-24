@@ -12,7 +12,7 @@ Fantasy football mirror app — import a celebrity's Sleeper team and prove you 
 
 ```bash
 cp api/.env.example api/.env   # edit if needed
-make db                        # start postgres (creates mirrorme + mirrorme_test)
+make db                        # start postgres (creates mirrorleague + mirrorleague_test)
 make migrate-up                # apply schema
 ```
 
@@ -42,7 +42,7 @@ cd web && npm run dev  # Vite frontend (localhost:5173)
 make test
 ```
 
-Tests run against `mirrorme_test` — your dev database is never touched. The test suite seeds reference data (players) once in `TestMain`. Tests that write transactional data (lineups, picks) truncate their own tables before running.
+Tests run against `mirrorleague_test` — your dev database is never touched. The test suite seeds reference data (players) once in `TestMain`. Tests that write transactional data (lineups, picks) truncate their own tables before running.
 
 ## Migrations
 

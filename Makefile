@@ -12,7 +12,7 @@ db-stop:
 db-reset:
 	docker compose down -v
 	docker compose up -d
-	until docker compose exec db pg_isready -U mirrorme; do sleep 1; done
+	until docker compose exec db pg_isready -U mirrorleague; do sleep 1; done
 	$(MAKE) migrate-up
 	$(MAKE) seed-players
 

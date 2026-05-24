@@ -26,7 +26,7 @@ import (
 	"github.com/sunkencosts/mirror-me/internal/provider"
 )
 
-const testDatabaseURL = "postgres://mirrorme:mirrorme@localhost:5433/mirrorme_test"
+const testDatabaseURL = "postgres://mirrorleague:mirrorleague@localhost:5433/mirrorleague_test"
 
 // testJWTSecret is used by signTestJWT and must match the JWT_SECRET env var in newTestServer.
 const testJWTSecret = "test-jwt-secret-32bytes-long-pad!"
@@ -46,7 +46,7 @@ var testPlayers = []provider.Player{
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 
-	migrateURL := "pgx5://mirrorme:mirrorme@localhost:5433/mirrorme_test"
+	migrateURL := "pgx5://mirrorleague:mirrorleague@localhost:5433/mirrorleague_test"
 	mg, err := migrate.New("file://../../migrations", migrateURL)
 	if err != nil {
 		log.Fatalf("TestMain: create migrator: %v", err)
