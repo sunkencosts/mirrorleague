@@ -8,6 +8,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: cd api && go build -o ../server ./cmd/server
+        run: cd api && go build -o ~/apps/mirrorleague/server ./cmd/server
       - name: Restart service
         run: sudo systemctl restart mirrorleague
