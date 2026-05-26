@@ -24,6 +24,9 @@ type sleeperDeps interface {
 func addRoutes(mux *http.ServeMux, sleeperClient sleeperDeps, store *db.Store, cfg config.Config, googleClient *googleauth.Client) {
 	jwtSecret := []byte(cfg.JWTSecret)
 	requireAuth := handlers.RequireAuth(jwtSecret)
+	adminMux := http.NewServeMux()
+	adminMux.Handle("POST /admin/sync-players", handlers.HandleSyncPlayers(store, sleeperClient, cfg.SleeperBaseURL, cfg.RankingsCSVURL))
+	mux.Handle("/admin/", handlers.RequireAdminSecret(cfg.AdminSecret)(adminMux))
 
 	mux.Handle("GET /auth/google", handlers.HandleGoogleLogin(googleClient))
 	mux.Handle("GET /auth/google/callback", handlers.HandleGoogleCallback(googleClient, store, jwtSecret, cfg.FrontendURL))
@@ -47,7 +50,6 @@ func addRoutes(mux *http.ServeMux, sleeperClient sleeperDeps, store *db.Store, c
 	mux.Handle("GET /league/{leagueId}/week/{week}", handlers.HandleGetWeekMatchups(sleeperClient))
 	mux.Handle("GET /league/{leagueId}/week/{week}/roster/{rosterId}/compare", handlers.HandleGetCompare(sleeperClient, store))
 	mux.Handle("GET /league/{leagueId}", handlers.HandleGetLeague(sleeperClient))
-	mux.Handle("POST /admin/sync-players", handlers.HandleSyncPlayers(store, sleeperClient, cfg.SleeperBaseURL, cfg.RankingsCSVURL))
 	mux.HandleFunc("GET /healthz", handleHealthz(store))
 	mux.Handle("/", spaHandler("web/dist"))
 }

@@ -33,6 +33,9 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 	if cfg.JWTSecret == "" {
 		return fmt.Errorf("JWT_SECRET must be set")
 	}
+	if cfg.AdminSecret == "" {
+		return fmt.Errorf("ADMIN_SECRET must be set")
+	}
 
 	logger, closeLog, err := logger.New(cfg.AppEnv, cfg.LogFile, stdout, stderr)
 	if err != nil {

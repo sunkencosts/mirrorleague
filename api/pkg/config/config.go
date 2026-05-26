@@ -18,6 +18,7 @@ type Config struct {
 	GoogleUserInfoURL  string
 	FrontendURL        string
 	JWTSecret          string
+	AdminSecret        string
 	LogFile            string
 }
 
@@ -80,6 +81,7 @@ func Load(getenv func(string) string) Config {
 		GoogleUserInfoURL:  googleUserInfoURL,
 		FrontendURL:        frontendURL,
 		JWTSecret:          getenv("JWT_SECRET"),
+		AdminSecret:        getenv("ADMIN_SECRET"),
 		LogFile:            getenv("LOG_FILE"),
 	}
 }

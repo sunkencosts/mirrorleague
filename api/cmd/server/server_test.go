@@ -30,6 +30,7 @@ const testDatabaseURL = "postgres://mirrorleague:mirrorleague@localhost:5433/mir
 
 // testJWTSecret is used by signTestJWT and must match the JWT_SECRET env var in newTestServer.
 const testJWTSecret = "test-jwt-secret-32bytes-long-pad!"
+const testAdminSecret = "test-admin-secret"
 
 const testUserID = "00000000-0000-0000-0000-000000000001"
 
@@ -143,6 +144,8 @@ func newTestServer(t *testing.T, sleeperHandler http.Handler, extraEnv ...map[st
 			return fakeGoogle.URL + "/oauth2/v2/userinfo"
 		case "JWT_SECRET":
 			return testJWTSecret
+		case "ADMIN_SECRET":
+			return testAdminSecret
 		case "FRONTEND_URL":
 			return "http://localhost:9999"
 		}
@@ -731,7 +734,9 @@ func TestSyncPlayers(t *testing.T) {
 		}
 	}), map[string]string{"RANKINGS_CSV_URL": fakeRankings.URL})
 
-	resp, err := http.Post(baseURL+"/admin/sync-players", "", nil)
+	req, _ := http.NewRequest(http.MethodPost, baseURL+"/admin/sync-players", nil)
+	req.Header.Set("X-Admin-Secret", testAdminSecret)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -747,6 +752,34 @@ func TestSyncPlayers(t *testing.T) {
 	if result["upserted"] != 2 {
 		t.Errorf("expected 2 upserted, got %d", result["upserted"])
 	}
+}
+
+func TestSyncPlayers_Unauthorized(t *testing.T) {
+	baseURL := newTestServer(t, noopHandler())
+
+	t.Run("no secret", func(t *testing.T) {
+		resp, err := http.Post(baseURL+"/admin/sync-players", "", nil)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("expected 401, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("wrong secret", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodPost, baseURL+"/admin/sync-players", nil)
+		req.Header.Set("X-Admin-Secret", "wrong-secret")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("expected 401, got %d", resp.StatusCode)
+		}
+	})
 }
 
 func lineupSleeperHandler() http.Handler {

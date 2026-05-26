@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
@@ -22,6 +23,19 @@ func RequireAuth(jwtSecret []byte) func(http.Handler) http.Handler {
 			}
 			ctx := context.WithValue(r.Context(), claimsKey, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func RequireAdminSecret(secret string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			provided := r.Header.Get("X-Admin-Secret")
+			if subtle.ConstantTimeCompare([]byte(provided), []byte(secret)) != 1 {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
 		})
 	}
 }
