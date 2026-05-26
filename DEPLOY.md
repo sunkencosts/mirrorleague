@@ -65,17 +65,29 @@ MIGRATIONS_URL=file:///home/bpalmer/apps/mirrorleague/api/migrations
 
 ### Useful commands
 ```bash
-# Check service status
-sudo systemctl status mirrorleague
-
-# View logs
-sudo journalctl -u mirrorleague -f
-
-# Restart after manual binary update
+# Restart the server
 sudo systemctl restart mirrorleague
 
+# Check service status (all at once)
+sudo systemctl status mirrorleague cloudflared actions.runner*
+
+# Tail logs live (stays open, Ctrl+C to exit)
+sudo journalctl -u mirrorleague -f
+
+# View last N lines without following
+sudo journalctl -u mirrorleague -n 100
+
+# Resource usage (interactive, F4 to filter by name)
+htop
+
+# Quick memory/CPU snapshot
+ps aux --sort=-%mem | head -20
+
 # Source .env manually (for running binaries outside systemd)
-set -a && source /home/bpalmer/apps/mirrorleague/.env && set +a
+set -a && source ~/apps/mirrorleague/.env && set +a
+
+# Sync players (run after first deploy or if players table is empty)
+curl -X POST https://api.mirrorleague.com/admin/sync-players
 ```
 
 ### Gotchas discovered
