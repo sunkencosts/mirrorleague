@@ -86,7 +86,13 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 		return fmt.Errorf("listen: %w", err)
 	}
 
-	httpServer := &http.Server{Handler: srv, ReadHeaderTimeout: 10 * time.Second}
+	httpServer := &http.Server{
+		Handler:           srv,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 
 	go func() {
 		logger.Info("server listening", slog.String("addr", listener.Addr().String()))
