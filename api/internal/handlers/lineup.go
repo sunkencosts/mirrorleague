@@ -64,7 +64,7 @@ func HandleCreateLineup(store lineupStore, p lineupMatchupProvider) http.Handler
 			http.Error(w, "failed to create lineup", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Location", "/api/lineups/"+lineup.ID)
+		w.Header().Set("Location", "/lineups/"+lineup.ID)
 		_ = encode(w, r, http.StatusCreated, lineup)
 	})
 }
