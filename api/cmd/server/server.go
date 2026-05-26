@@ -47,7 +47,14 @@ func run(ctx context.Context, getenv func(string) string, stdout, stderr io.Writ
 		}
 	}()
 
-	dbpool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("parsing database URL: %w", err)
+	}
+	poolConfig.MaxConnLifetime = 30 * time.Minute
+	poolConfig.MaxConnIdleTime = 5 * time.Minute
+
+	dbpool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return fmt.Errorf("creating connection pool: %w", err)
 	}
@@ -122,9 +129,20 @@ func NewServer(sleeperClient sleeperDeps, cfg config.Config, store *db.Store, go
 	addRoutes(mux, sleeperClient, store, cfg, googleClient)
 
 	var handler http.Handler = mux
+	handler = timeoutMiddleware(20 * time.Second)(handler)
 	handler = corsMiddleware(cfg.FrontendURL)(handler)
 	handler = requestLogger(logger)(handler)
 	return handler
+}
+
+func timeoutMiddleware(timeout time.Duration) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), timeout)
+			defer cancel()
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 func corsMiddleware(frontendURL string) func(http.Handler) http.Handler {
