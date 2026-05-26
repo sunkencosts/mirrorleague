@@ -58,7 +58,7 @@ DATABASE_URL=postgres://mirrorleague:<password>@localhost:5432/mirrorleague
 JWT_SECRET=<openssl rand -base64 32>
 GOOGLE_CLIENT_ID=<from Google Cloud Console>
 GOOGLE_CLIENT_SECRET=<from Google Cloud Console>
-GOOGLE_REDIRECT_URL=https://api.mirrorleague.com/api/auth/google/callback
+GOOGLE_REDIRECT_URL=https://api.mirrorleague.com/auth/google/callback
 FRONTEND_URL=https://mirrorleague.com
 MIGRATIONS_URL=file:///home/bpalmer/apps/mirrorleague/api/migrations
 ```
