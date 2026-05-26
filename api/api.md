@@ -2,7 +2,7 @@
 
 > **Keep this file up to date.** Whenever you add, remove, or change a route in `cmd/server/routes.go`, update this file in the same commit.
 
-Base path: `/api`
+Base path: `/`
 
 ---
 
@@ -10,7 +10,7 @@ Base path: `/api`
 
 A user's saved references to Sleeper leagues, with optional labels. `user_id` is a client-generated UUID stored locally by the frontend (no auth yet — will move to session in Step 3).
 
-### `POST /api/league-bookmarks`
+### `POST /league-bookmarks`
 Save a league bookmark (upserts — if the league is already saved, the label is updated).
 
 **Request body**
@@ -34,7 +34,7 @@ Save a league bookmark (upserts — if the league is already saved, the label is
 
 ---
 
-### `GET /api/league-bookmarks`
+### `GET /league-bookmarks`
 List all bookmarks for a user.
 
 **Query params**
@@ -50,7 +50,7 @@ Returns an empty array if the user has no bookmarks.
 
 ---
 
-### `PATCH /api/league-bookmarks/{leagueId}`
+### `PATCH /league-bookmarks/{leagueId}`
 Update the label on an existing bookmark.
 
 **Path params**
@@ -64,12 +64,12 @@ Update the label on an existing bookmark.
 }
 ```
 
-**Response** `200 OK` — same shape as `POST /api/league-bookmarks`  
+**Response** `200 OK` — same shape as `POST /league-bookmarks`  
 **404** if no bookmark exists for that `user_id` + `leagueId`
 
 ---
 
-### `DELETE /api/league-bookmarks/{leagueId}`
+### `DELETE /league-bookmarks/{leagueId}`
 Remove a bookmark.
 
 **Path params**
@@ -87,7 +87,7 @@ Remove a bookmark.
 
 ## Lineups
 
-### `POST /api/lineups`
+### `POST /lineups`
 Create a new lineup for a user.
 
 **Request body**
@@ -118,11 +118,11 @@ Create a new lineup for a user.
   "updated_at": "RFC3339"
 }
 ```
-Sets `Location: /api/lineups/{id}` header.
+Sets `Location: /lineups/{id}` header.
 
 ---
 
-### `PATCH /api/lineups/{id}`
+### `PATCH /lineups/{id}`
 Update the starters for an existing lineup.
 
 **Path params**
@@ -138,11 +138,11 @@ Update the starters for an existing lineup.
 - `user_id` must match the lineup's owner or `403 Forbidden` is returned
 - `starters` validated against the roster on the existing lineup
 
-**Response** `200 OK` — same shape as `POST /api/lineups`
+**Response** `200 OK` — same shape as `POST /lineups`
 
 ---
 
-### `GET /api/lineups`
+### `GET /lineups`
 List lineups matching the given filters.
 
 **Query params**
@@ -160,20 +160,20 @@ List lineups matching the given filters.
 
 ---
 
-### `GET /api/lineups/{id}`
+### `GET /lineups/{id}`
 Fetch a single lineup by ID.
 
 **Path params**
 - `id` — UUID of the lineup
 
-**Response** `200 OK` — same shape as `POST /api/lineups`  
+**Response** `200 OK` — same shape as `POST /lineups`  
 **404** if not found
 
 ---
 
 ## League
 
-### `GET /api/league/{leagueId}`
+### `GET /league/{leagueId}`
 Fetch league metadata from Sleeper.
 
 **Path params**
@@ -183,7 +183,7 @@ Fetch league metadata from Sleeper.
 
 ---
 
-### `GET /api/league/{leagueId}/rosters`
+### `GET /league/{leagueId}/rosters`
 Fetch all rosters for a league from Sleeper.
 
 **Path params**
@@ -208,7 +208,7 @@ Fetch all rosters for a league from Sleeper.
 
 ## Admin
 
-### `POST /api/admin/sync-players`
+### `POST /admin/sync-players`
 Pulls the full player list from Sleeper and dynasty rankings from the configured CSV URL, then upserts all players into the database. Runs two fetches in parallel.
 
 No request body.

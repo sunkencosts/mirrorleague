@@ -134,7 +134,7 @@ func newTestServer(t *testing.T, sleeperHandler http.Handler, extraEnv ...map[st
 		case "GOOGLE_CLIENT_SECRET":
 			return "test-client-secret"
 		case "GOOGLE_REDIRECT_URL":
-			return "http://localhost:" + port + "/api/auth/google/callback"
+			return "http://localhost:" + port + "/auth/google/callback"
 		case "GOOGLE_AUTH_URL":
 			return fakeGoogle.URL + "/oauth2/v2/auth"
 		case "GOOGLE_TOKEN_URL":
@@ -191,7 +191,7 @@ func doGoogleLogin(t *testing.T, baseURL, code string) string {
 	}
 
 	// Initiate login — get state cookie and state value from redirect URL.
-	resp1, err := noFollow.Get(baseURL + "/api/auth/google")
+	resp1, err := noFollow.Get(baseURL + "/auth/google")
 	if err != nil {
 		t.Fatalf("doGoogleLogin: initiate: %v", err)
 	}
@@ -218,7 +218,7 @@ func doGoogleLogin(t *testing.T, baseURL, code string) string {
 	}
 
 	// Hit the callback with the state and the caller-supplied code.
-	callbackURL := baseURL + "/api/auth/google/callback?code=" + url.QueryEscape(code) + "&state=" + url.QueryEscape(state)
+	callbackURL := baseURL + "/auth/google/callback?code=" + url.QueryEscape(code) + "&state=" + url.QueryEscape(state)
 	req2, _ := http.NewRequest(http.MethodGet, callbackURL, nil)
 	req2.AddCookie(stateCookie)
 	resp2, err := noFollow.Do(req2)
@@ -340,7 +340,7 @@ func TestAuthMe_Valid(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 	token := signTestJWT("00000000-0000-0000-0000-000000000099", "me@example.com", "cool_bear")
 
-	req, _ := http.NewRequest(http.MethodGet, baseURL+"/api/auth/me", nil)
+	req, _ := http.NewRequest(http.MethodGet, baseURL+"/auth/me", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -369,7 +369,7 @@ func TestAuthMe_Valid(t *testing.T) {
 func TestAuthMe_NoToken(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	resp, err := http.Get(baseURL + "/api/auth/me")
+	resp, err := http.Get(baseURL + "/auth/me")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -383,7 +383,7 @@ func TestAuthMe_NoToken(t *testing.T) {
 func TestLogout_ClearsCookie(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/api/auth/logout", nil)
+	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/auth/logout", nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -409,7 +409,7 @@ func TestDevLogin_IssuesUsableToken(t *testing.T) {
 			return http.ErrUseLastResponse
 		},
 	}
-	resp, err := noFollow.Get(baseURL + "/api/dev/login")
+	resp, err := noFollow.Get(baseURL + "/dev/login")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -429,19 +429,19 @@ func TestDevLogin_IssuesUsableToken(t *testing.T) {
 	}
 
 	// Token must be accepted by a protected route and carry the default dev identity.
-	req, _ := http.NewRequest(http.MethodGet, baseURL+"/api/auth/me", nil)
+	req, _ := http.NewRequest(http.MethodGet, baseURL+"/auth/me", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	meResp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("/api/auth/me request failed: %v", err)
+		t.Fatalf("/auth/me request failed: %v", err)
 	}
 	defer meResp.Body.Close()
 	if meResp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 from /api/auth/me with dev token, got %d", meResp.StatusCode)
+		t.Fatalf("expected 200 from /auth/me with dev token, got %d", meResp.StatusCode)
 	}
 	var user provider.AuthUser
 	if err := json.NewDecoder(meResp.Body).Decode(&user); err != nil {
-		t.Fatalf("decode /api/auth/me: %v", err)
+		t.Fatalf("decode /auth/me: %v", err)
 	}
 	if user.ID != "00000000-0000-0000-0000-000000000001" {
 		t.Errorf("expected dev user_id, got %q", user.ID)
@@ -457,7 +457,7 @@ func TestDevLogin_IssuesUsableToken(t *testing.T) {
 func TestDevLogin_NotAvailableInProduction(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler(), map[string]string{"APP_ENV": "production"})
 
-	resp, err := http.Get(baseURL + "/api/dev/login")
+	resp, err := http.Get(baseURL + "/dev/login")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -477,7 +477,7 @@ func TestMerge_ReassociatesBookmarks(t *testing.T) {
 
 	token := signTestJWT(realUserID, "merge@example.com", "merge_user")
 	body := fmt.Sprintf(`{"anonymous_id":%q}`, anonID)
-	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/auth/merge", token, body))
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/auth/merge", token, body))
 	if err != nil {
 		t.Fatalf("merge request failed: %v", err)
 	}
@@ -486,7 +486,7 @@ func TestMerge_ReassociatesBookmarks(t *testing.T) {
 		t.Fatalf("expected 204, got %d", resp.StatusCode)
 	}
 
-	listResp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=" + realUserID)
+	listResp, err := http.Get(baseURL + "/league-bookmarks?user_id=" + realUserID)
 	if err != nil {
 		t.Fatalf("list request failed: %v", err)
 	}
@@ -499,7 +499,7 @@ func TestMerge_ReassociatesBookmarks(t *testing.T) {
 		t.Errorf("expected bookmark re-keyed to real user, got %+v", leagues)
 	}
 
-	anonResp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=" + anonID)
+	anonResp, err := http.Get(baseURL + "/league-bookmarks?user_id=" + anonID)
 	if err != nil {
 		t.Fatalf("anon list request failed: %v", err)
 	}
@@ -522,7 +522,7 @@ func TestMerge_ReassociatesLineups(t *testing.T) {
 
 	realToken := signTestJWT(realUserID, "real@example.com", "real_user")
 	body := fmt.Sprintf(`{"anonymous_id":%q}`, anonID)
-	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/auth/merge", realToken, body))
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/auth/merge", realToken, body))
 	if err != nil {
 		t.Fatalf("merge request: %v", err)
 	}
@@ -531,7 +531,7 @@ func TestMerge_ReassociatesLineups(t *testing.T) {
 		t.Fatalf("expected 204, got %d", resp.StatusCode)
 	}
 
-	listURL := baseURL + "/api/lineups?user_id=" + realUserID + "&league_id=test-league&week_number=1"
+	listURL := baseURL + "/lineups?user_id=" + realUserID + "&league_id=test-league&week_number=1"
 	listResp, err := http.Get(listURL)
 	if err != nil {
 		t.Fatalf("list request: %v", err)
@@ -545,7 +545,7 @@ func TestMerge_ReassociatesLineups(t *testing.T) {
 		t.Errorf("expected 1 lineup under real user after merge, got %d", len(lineups))
 	}
 
-	anonListURL := baseURL + "/api/lineups?user_id=" + anonID + "&league_id=test-league&week_number=1"
+	anonListURL := baseURL + "/lineups?user_id=" + anonID + "&league_id=test-league&week_number=1"
 	anonResp, err := http.Get(anonListURL)
 	if err != nil {
 		t.Fatalf("anon list request: %v", err)
@@ -562,7 +562,7 @@ func TestMerge_Unauthenticated(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
 	body := `{"anonymous_id":"some-anon-id"}`
-	resp, err := http.Post(baseURL+"/api/auth/merge", "application/json", strings.NewReader(body))
+	resp, err := http.Post(baseURL+"/auth/merge", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -577,7 +577,7 @@ func TestCreateLineup_Unauthenticated(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
 
 	body := `{"source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
-	resp, err := http.Post(baseURL+"/api/lineups", "application/json", strings.NewReader(body))
+	resp, err := http.Post(baseURL+"/lineups", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -594,7 +594,7 @@ func TestCreateLineup_Authenticated(t *testing.T) {
 	token := signTestJWT(userID, "auth@example.com", "auth_user")
 
 	body := `{"source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
-	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/lineups", token, body))
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/lineups", token, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -626,7 +626,7 @@ func TestGetRosters(t *testing.T) {
 		}
 	}))
 
-	resp, err := http.Get(baseURL + "/api/league/abc/rosters")
+	resp, err := http.Get(baseURL + "/league/abc/rosters")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -661,7 +661,7 @@ func TestGetLeague(t *testing.T) {
 		}
 	}))
 
-	resp, err := http.Get(baseURL + "/api/league/abc")
+	resp, err := http.Get(baseURL + "/league/abc")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -689,7 +689,7 @@ func TestGetLeagueNotFound(t *testing.T) {
 		http.NotFound(w, r)
 	}))
 
-	resp, err := http.Get(baseURL + "/api/league/bad-id")
+	resp, err := http.Get(baseURL + "/league/bad-id")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -731,7 +731,7 @@ func TestSyncPlayers(t *testing.T) {
 		}
 	}), map[string]string{"RANKINGS_CSV_URL": fakeRankings.URL})
 
-	resp, err := http.Post(baseURL+"/api/admin/sync-players", "", nil)
+	resp, err := http.Post(baseURL+"/admin/sync-players", "", nil)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -773,7 +773,7 @@ func lineupSleeperHandler() http.Handler {
 func createTestLineup(t *testing.T, baseURL, token string) provider.Lineup {
 	t.Helper()
 	body := `{"source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
-	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/lineups", token, body))
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/lineups", token, body))
 	if err != nil {
 		t.Fatalf("createTestLineup: request failed: %v", err)
 	}
@@ -793,7 +793,7 @@ func TestCreateLineup(t *testing.T) {
 	token := signTestJWT(testUserID, "test@example.com", "test_user")
 
 	body := `{"source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["111","222"]}`
-	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/lineups", token, body))
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/lineups", token, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -809,8 +809,8 @@ func TestCreateLineup(t *testing.T) {
 	if lineup.ID == "" {
 		t.Error("expected a non-empty lineup ID")
 	}
-	if loc := resp.Header.Get("Location"); loc != "/api/lineups/"+lineup.ID {
-		t.Errorf("expected Location header %q, got %q", "/api/lineups/"+lineup.ID, loc)
+	if loc := resp.Header.Get("Location"); loc != "/lineups/"+lineup.ID {
+		t.Errorf("expected Location header %q, got %q", "/lineups/"+lineup.ID, loc)
 	}
 	if lineup.UserID != testUserID {
 		t.Errorf("expected user_id %q, got %q", testUserID, lineup.UserID)
@@ -834,7 +834,7 @@ func TestCreateLineup_InvalidPlayer(t *testing.T) {
 	token := signTestJWT(testUserID, "test@example.com", "test_user")
 
 	body := `{"source":"sleeper","league_id":"test-league","roster_id":1,"week_number":1,"starters":["999"]}`
-	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/lineups", token, body))
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/lineups", token, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -850,7 +850,7 @@ func TestGetLineup(t *testing.T) {
 	token := signTestJWT(testUserID, "test@example.com", "test_user")
 	created := createTestLineup(t, baseURL, token)
 
-	resp, err := http.Get(baseURL + "/api/lineups/" + created.ID)
+	resp, err := http.Get(baseURL + "/lineups/" + created.ID)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -871,7 +871,7 @@ func TestGetLineup(t *testing.T) {
 func TestGetLineup_NotFound(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
 
-	resp, err := http.Get(baseURL + "/api/lineups/00000000-0000-0000-0000-000000000000")
+	resp, err := http.Get(baseURL + "/lineups/00000000-0000-0000-0000-000000000000")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -888,7 +888,7 @@ func TestUpdateLineup(t *testing.T) {
 	created := createTestLineup(t, baseURL, token)
 
 	body := `{"starters":["111","333"]}`
-	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPatch, baseURL+"/api/lineups/"+created.ID, token, body))
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPatch, baseURL+"/lineups/"+created.ID, token, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -913,7 +913,7 @@ func TestUpdateLineup_WrongUser(t *testing.T) {
 	created := createTestLineup(t, baseURL, token1)
 
 	body := `{"starters":["111"]}`
-	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPatch, baseURL+"/api/lineups/"+created.ID, token2, body))
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPatch, baseURL+"/lineups/"+created.ID, token2, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -929,7 +929,7 @@ func TestUpdateLineup_NotFound(t *testing.T) {
 	token := signTestJWT(testUserID, "test@example.com", "test_user")
 
 	body := `{"starters":["111"]}`
-	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPatch, baseURL+"/api/lineups/00000000-0000-0000-0000-000000000000", token, body))
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPatch, baseURL+"/lineups/00000000-0000-0000-0000-000000000000", token, body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -945,7 +945,7 @@ func TestListLineups_FilterByRoster(t *testing.T) {
 	token := signTestJWT(testUserID, "test@example.com", "test_user")
 	created := createTestLineup(t, baseURL, token)
 
-	url := baseURL + "/api/lineups?user_id=" + created.UserID + "&league_id=test-league&week_number=1&roster_id=1"
+	url := baseURL + "/lineups?user_id=" + created.UserID + "&league_id=test-league&week_number=1&roster_id=1"
 	resp, err := http.Get(url)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -972,7 +972,7 @@ func TestListLineups_All(t *testing.T) {
 	token := signTestJWT(testUserID, "test@example.com", "test_user")
 	created := createTestLineup(t, baseURL, token)
 
-	url := baseURL + "/api/lineups?user_id=" + created.UserID + "&league_id=test-league&week_number=1"
+	url := baseURL + "/lineups?user_id=" + created.UserID + "&league_id=test-league&week_number=1"
 	resp, err := http.Get(url)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -997,7 +997,7 @@ func TestListLineups_All(t *testing.T) {
 func TestListLineups_Empty(t *testing.T) {
 	baseURL := newTestServer(t, lineupSleeperHandler())
 
-	url := baseURL + "/api/lineups?user_id=00000000-0000-0000-0000-000000000001&league_id=test-league&week_number=99"
+	url := baseURL + "/lineups?user_id=00000000-0000-0000-0000-000000000001&league_id=test-league&week_number=99"
 	resp, err := http.Get(url)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1037,7 +1037,7 @@ func TestGetWeekMatchups(t *testing.T) {
 		}
 	}))
 
-	resp, err := http.Get(baseURL + "/api/league/abc/week/8")
+	resp, err := http.Get(baseURL + "/league/abc/week/8")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1082,7 +1082,7 @@ func TestGetWeekMatchups(t *testing.T) {
 func TestGetWeekMatchups_InvalidWeek(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	resp, err := http.Get(baseURL + "/api/league/abc/week/notanumber")
+	resp, err := http.Get(baseURL + "/league/abc/week/notanumber")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1096,7 +1096,7 @@ func TestGetWeekMatchups_InvalidWeek(t *testing.T) {
 func TestGetWeekMatchups_ZeroWeek(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	resp, err := http.Get(baseURL + "/api/league/abc/week/0")
+	resp, err := http.Get(baseURL + "/league/abc/week/0")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1136,7 +1136,7 @@ func compareSleeperHandler() http.Handler {
 func createLineupForCompare(t *testing.T, baseURL, token string) provider.Lineup {
 	t.Helper()
 	body := `{"source":"sleeper","league_id":"abc","roster_id":1,"week_number":8,"starters":["111","333"]}`
-	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/api/lineups", token, body))
+	resp, err := http.DefaultClient.Do(authedJSONRequest(http.MethodPost, baseURL+"/lineups", token, body))
 	if err != nil {
 		t.Fatalf("createLineupForCompare: request failed: %v", err)
 	}
@@ -1157,7 +1157,7 @@ func TestCompareLineup(t *testing.T) {
 	token := signTestJWT(compareUserID, "compare@example.com", "compare_user")
 	createLineupForCompare(t, baseURL, token)
 
-	resp, err := http.Get(baseURL + "/api/league/abc/week/8/roster/1/compare?user_id=" + compareUserID)
+	resp, err := http.Get(baseURL + "/league/abc/week/8/roster/1/compare?user_id=" + compareUserID)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1196,7 +1196,7 @@ func TestCompareLineup(t *testing.T) {
 func TestCompareLineup_NoLineup(t *testing.T) {
 	baseURL := newTestServer(t, compareSleeperHandler())
 
-	resp, err := http.Get(baseURL + "/api/league/abc/week/8/roster/1/compare?user_id=nobody")
+	resp, err := http.Get(baseURL + "/league/abc/week/8/roster/1/compare?user_id=nobody")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1210,7 +1210,7 @@ func TestCompareLineup_NoLineup(t *testing.T) {
 func TestCompareLineup_InvalidWeek(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	resp, err := http.Get(baseURL + "/api/league/abc/week/notanumber/roster/1/compare?user_id=x")
+	resp, err := http.Get(baseURL + "/league/abc/week/notanumber/roster/1/compare?user_id=x")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1224,7 +1224,7 @@ func TestCompareLineup_InvalidWeek(t *testing.T) {
 func TestCompareLineup_MissingUserID(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	resp, err := http.Get(baseURL + "/api/league/abc/week/8/roster/1/compare")
+	resp, err := http.Get(baseURL + "/league/abc/week/8/roster/1/compare")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1242,7 +1242,7 @@ func noopHandler() http.Handler {
 func saveTestUserLeague(t *testing.T, baseURL, userID, leagueID, source, label string) provider.UserLeague {
 	t.Helper()
 	body := fmt.Sprintf(`{"user_id":%q,"league_id":%q,"source":%q,"label":%q}`, userID, leagueID, source, label)
-	resp, err := http.Post(baseURL+"/api/league-bookmarks", "application/json", strings.NewReader(body))
+	resp, err := http.Post(baseURL+"/league-bookmarks", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("saveTestUserLeague: request failed: %v", err)
 	}
@@ -1277,7 +1277,7 @@ func TestListUserLeagues(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 	saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "My League")
 
-	resp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-a")
+	resp, err := http.Get(baseURL + "/league-bookmarks?user_id=user-a")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1301,7 +1301,7 @@ func TestListUserLeagues(t *testing.T) {
 func TestListUserLeagues_Empty(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	resp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-nobody")
+	resp, err := http.Get(baseURL + "/league-bookmarks?user_id=user-nobody")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1323,7 +1323,7 @@ func TestListUserLeagues_Isolation(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 	saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "User A League")
 
-	resp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-b")
+	resp, err := http.Get(baseURL + "/league-bookmarks?user_id=user-b")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1347,7 +1347,7 @@ func TestSaveUserLeague_Upsert(t *testing.T) {
 		t.Errorf("expected updated label, got %q", ul.Label)
 	}
 
-	resp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-a")
+	resp, err := http.Get(baseURL + "/league-bookmarks?user_id=user-a")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1370,7 +1370,7 @@ func TestUpdateUserLeague(t *testing.T) {
 	saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "Old Label")
 
 	body := `{"user_id":"user-a","label":"New Label"}`
-	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/league-bookmarks/league-1?source=sleeper", strings.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/league-bookmarks/league-1?source=sleeper", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -1394,7 +1394,7 @@ func TestUpdateUserLeague_NotFound(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
 	body := `{"user_id":"user-a","label":"Whatever"}`
-	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/api/league-bookmarks/nonexistent?source=sleeper", strings.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPatch, baseURL+"/league-bookmarks/nonexistent?source=sleeper", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -1411,7 +1411,7 @@ func TestDeleteUserLeague(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 	saveTestUserLeague(t, baseURL, "user-a", "league-1", "sleeper", "To Delete")
 
-	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/api/league-bookmarks/league-1?user_id=user-a&source=sleeper", nil)
+	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/league-bookmarks/league-1?user_id=user-a&source=sleeper", nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1422,7 +1422,7 @@ func TestDeleteUserLeague(t *testing.T) {
 		t.Fatalf("expected 204, got %d", resp.StatusCode)
 	}
 
-	listResp, err := http.Get(baseURL + "/api/league-bookmarks?user_id=user-a")
+	listResp, err := http.Get(baseURL + "/league-bookmarks?user_id=user-a")
 	if err != nil {
 		t.Fatalf("list request failed: %v", err)
 	}
@@ -1440,7 +1440,7 @@ func TestDeleteUserLeague(t *testing.T) {
 func TestDeleteUserLeague_NotFound(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/api/league-bookmarks/nonexistent?user_id=user-a&source=sleeper", nil)
+	req, _ := http.NewRequest(http.MethodDelete, baseURL+"/league-bookmarks/nonexistent?user_id=user-a&source=sleeper", nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1455,9 +1455,9 @@ func TestDeleteUserLeague_NotFound(t *testing.T) {
 func TestGetPlayers(t *testing.T) {
 	baseURL := newTestServer(t, noopHandler())
 
-	resp, err := http.Get(baseURL + "/api/players")
+	resp, err := http.Get(baseURL + "/players")
 	if err != nil {
-		t.Fatalf("GET /api/players: %v", err)
+		t.Fatalf("GET /players: %v", err)
 	}
 	defer resp.Body.Close()
 

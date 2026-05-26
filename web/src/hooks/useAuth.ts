@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { postJson } from "../api";
+import { postJson, fetchJson } from "../api";
 import type { AuthUser } from "../types";
 import { ANON_USER_ID_KEY, useUserId } from "./useUserId";
 
@@ -10,11 +10,11 @@ export function useAuthState() {
 	const { data: user = null, isLoading } = useQuery({
 		queryKey: ["auth"],
 		queryFn: async () => {
-			const resp = await fetch("/api/auth/me", { credentials: "include" });
-			if (!resp.ok) {
+			try {
+				return await fetchJson<AuthUser>("/auth/me");
+			} catch {
 				return null;
 			}
-			return resp.json() as Promise<AuthUser>;
 		},
 		staleTime: 5 * 60 * 1000,
 	});
@@ -29,7 +29,7 @@ export function useAuthState() {
 		}
 		async function merge() {
 			try {
-				await postJson("/api/auth/merge", { anonymous_id: anonId });
+				await postJson("/auth/merge", { anonymous_id: anonId });
 				localStorage.removeItem(ANON_USER_ID_KEY);
 				queryClient.invalidateQueries();
 			} catch {

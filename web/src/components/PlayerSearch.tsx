@@ -27,7 +27,7 @@ export default function PlayerSearch({ rosters, onScrollToRoster }: Props) {
 
 	const { data: allPlayers = [] } = useQuery<SlimPlayer[]>({
 		queryKey: ["players"],
-		queryFn: () => fetchJson("/api/players"),
+		queryFn: () => fetchJson("/players"),
 		staleTime: Number.POSITIVE_INFINITY,
 	});
 

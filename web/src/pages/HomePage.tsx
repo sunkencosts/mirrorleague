@@ -18,7 +18,7 @@ export default function HomePage() {
 
 	const saveBookmark = useMutation({
 		mutationFn: (validatedId: string) =>
-			postJson<LeagueBookmark>("/api/league-bookmarks", {
+			postJson<LeagueBookmark>("/league-bookmarks", {
 				user_id: userId,
 				league_id: validatedId,
 				label: label.trim(),
@@ -36,7 +36,7 @@ export default function HomePage() {
 		setError(null);
 		setSubmitting(true);
 		try {
-			await fetchJson<League>(`/api/league/${id}`);
+			await fetchJson<League>(`/league/${id}`);
 			await saveBookmark.mutateAsync(id);
 		} catch (err) {
 			if ((err as ApiError)?.status === 404) {

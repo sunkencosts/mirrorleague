@@ -5,7 +5,13 @@ export default defineConfig({
 	plugins: [react()],
 	server: {
 		proxy: {
-			"/api": "http://localhost:8080",
+			"/auth": "http://localhost:8080",
+			"/dev": "http://localhost:8080",
+			"/league": "http://localhost:8080",
+			"/lineups": "http://localhost:8080",
+			"/players": "http://localhost:8080",
+			"/league-bookmarks": "http://localhost:8080",
+			"/admin": "http://localhost:8080",
 		},
 	},
 });

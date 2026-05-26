@@ -33,7 +33,7 @@ function AuthControls({ user, isLoading, onLogout, usernameCls, buttonCls }: Aut
 			type="button"
 			className={buttonCls}
 			onClick={() => {
-				window.location.href = "/api/auth/google";
+				window.location.href = `${import.meta.env.VITE_API_URL ?? ""}/auth/google`;
 			}}
 		>
 			Log in
@@ -47,7 +47,7 @@ export default function Layout() {
 	const queryClient = useQueryClient();
 
 	async function handleLogout() {
-		await deleteJson("/api/auth/logout");
+		await deleteJson("/auth/logout");
 		queryClient.invalidateQueries({ queryKey: ["auth"] });
 	}
 

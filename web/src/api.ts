@@ -7,8 +7,14 @@ export class ApiError extends Error {
 	}
 }
 
+const apiBase = import.meta.env.VITE_API_URL ?? "";
+
+function apiUrl(path: string): string {
+	return `${apiBase}${path}`;
+}
+
 export async function fetchJson<T>(url: string): Promise<T> {
-	const r = await fetch(url);
+	const r = await fetch(apiUrl(url), { credentials: "include" });
 	if (!r.ok) {
 		throw new ApiError(r.status, `${r.status} ${r.statusText}`);
 	}
@@ -16,8 +22,9 @@ export async function fetchJson<T>(url: string): Promise<T> {
 }
 
 async function mutateJson<T>(method: string, url: string, body: unknown): Promise<T> {
-	const r = await fetch(url, {
+	const r = await fetch(apiUrl(url), {
 		method,
+		credentials: "include",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify(body),
 	});
@@ -39,7 +46,7 @@ export function patchJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export async function deleteJson(url: string): Promise<void> {
-	const r = await fetch(url, { method: "DELETE" });
+	const r = await fetch(apiUrl(url), { method: "DELETE", credentials: "include" });
 	if (!r.ok) {
 		throw new ApiError(r.status, `${r.status} ${r.statusText}`);
 	}

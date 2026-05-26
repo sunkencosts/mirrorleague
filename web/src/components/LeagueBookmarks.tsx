@@ -16,7 +16,7 @@ export default function LeagueBookmarks({ userId }: Props) {
 	const queryClient = useQueryClient();
 	const { data: bookmarks = [] } = useQuery<LeagueBookmark[]>({
 		queryKey: bookmarksKey(userId),
-		queryFn: () => fetchJson(`/api/league-bookmarks?user_id=${userId}`),
+		queryFn: () => fetchJson(`/league-bookmarks?user_id=${userId}`),
 	});
 
 	const [editingId, setEditingId] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export default function LeagueBookmarks({ userId }: Props) {
 
 	const deleteMutation = useMutation({
 		mutationFn: ({ leagueId, source }: { leagueId: string; source: string }) =>
-			deleteJson(`/api/league-bookmarks/${leagueId}?user_id=${userId}&source=${source}`),
+			deleteJson(`/league-bookmarks/${leagueId}?user_id=${userId}&source=${source}`),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: bookmarksKey(userId) }),
 	});
 
@@ -45,7 +45,7 @@ export default function LeagueBookmarks({ userId }: Props) {
 			label: string;
 			source: string;
 		}) =>
-			patchJson<LeagueBookmark>(`/api/league-bookmarks/${leagueId}?source=${source}`, {
+			patchJson<LeagueBookmark>(`/league-bookmarks/${leagueId}?source=${source}`, {
 				user_id: userId,
 				label,
 			}),

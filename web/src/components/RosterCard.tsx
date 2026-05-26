@@ -226,7 +226,7 @@ export default function RosterCard({
 
 						{showAuthPrompt && (
 							<p className={styles.authPrompt}>
-								<a href="/api/auth/google">Sign in</a> to save your lineup picks.
+								<a href={`${import.meta.env.VITE_API_URL ?? ""}/auth/google`}>Sign in</a> to save your lineup picks.
 							</p>
 						)}
 						<div className={styles.starterGrid}>

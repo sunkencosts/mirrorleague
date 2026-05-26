@@ -81,7 +81,7 @@ export function useLineup({
 	const mutation = useMutation({
 		mutationFn: (starters: string[]) => {
 			if (state.lineupId === null) {
-				return postJson<Lineup>("/api/lineups", {
+				return postJson<Lineup>("/lineups", {
 					user_id: userId,
 					league_id: leagueId,
 					source: "sleeper",
@@ -90,7 +90,7 @@ export function useLineup({
 					starters,
 				});
 			}
-			return patchJson<Lineup>(`/api/lineups/${state.lineupId}`, {
+			return patchJson<Lineup>(`/lineups/${state.lineupId}`, {
 				user_id: userId,
 				starters,
 			});

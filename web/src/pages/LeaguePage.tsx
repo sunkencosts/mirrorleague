@@ -25,7 +25,7 @@ export default function LeaguePage() {
 		isLoading: leagueLoading,
 	} = useQuery<League>({
 		queryKey: leagueQueryKey,
-		queryFn: () => fetchJson(`/api/league/${leagueId}`),
+		queryFn: () => fetchJson(`/league/${leagueId}`),
 		enabled: !!leagueId,
 		throwOnError: true,
 	});
@@ -35,7 +35,7 @@ export default function LeaguePage() {
 		isLoading: rostersLoading,
 	} = useQuery<Roster[]>({
 		queryKey: ["rosters", leagueId],
-		queryFn: () => fetchJson(`/api/league/${leagueId}/rosters`),
+		queryFn: () => fetchJson(`/league/${leagueId}/rosters`),
 		select: (data) => data ?? [],
 		enabled: !!leagueId,
 		throwOnError: true,
@@ -43,7 +43,7 @@ export default function LeaguePage() {
 
 	const { data: weekMatchups = [] } = useQuery<WeekMatchup[]>({
 		queryKey: ["week-matchups", leagueId, weekNumber],
-		queryFn: () => fetchJson(`/api/league/${leagueId}/week/${weekNumber}`),
+		queryFn: () => fetchJson(`/league/${leagueId}/week/${weekNumber}`),
 		select: (data) => data ?? [],
 		placeholderData: keepPreviousData,
 		enabled: !!leagueId,
@@ -57,18 +57,18 @@ export default function LeaguePage() {
 	const { data: lineups = [] } = useQuery<Lineup[]>({
 		queryKey: ["lineups", userId, leagueId, weekNumber],
 		queryFn: () =>
-			fetchJson(`/api/lineups?user_id=${userId}&league_id=${leagueId}&week_number=${weekNumber}`),
+			fetchJson(`/lineups?user_id=${userId}&league_id=${leagueId}&week_number=${weekNumber}`),
 		enabled: !!leagueId,
 	});
 
 	const { data: bookmarks = [] } = useQuery<LeagueBookmark[]>({
 		queryKey: bookmarksKey(userId),
-		queryFn: () => fetchJson(`/api/league-bookmarks?user_id=${userId}`),
+		queryFn: () => fetchJson(`/league-bookmarks?user_id=${userId}`),
 	});
 
 	const { mutate: patchLabel } = useMutation({
 		mutationFn: ({ label, source }: { label: string; source: string }) =>
-			patchJson<LeagueBookmark>(`/api/league-bookmarks/${leagueId}?source=${source}`, {
+			patchJson<LeagueBookmark>(`/league-bookmarks/${leagueId}?source=${source}`, {
 				user_id: userId,
 				label,
 			}),

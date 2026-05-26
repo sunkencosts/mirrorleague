@@ -44,6 +44,13 @@ func generateUsername() string {
 	return adjectives[mrand.IntN(len(adjectives))] + "_" + nouns[mrand.IntN(len(nouns))] + fmt.Sprintf("%02d", mrand.IntN(100)) //nolint:gosec
 }
 
+func sameSiteMode(secure bool) http.SameSite {
+	if secure {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
+}
+
 func setAuthCookie(w http.ResponseWriter, token string, secure bool) {
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec
 		Name:     "auth_token",
@@ -52,7 +59,7 @@ func setAuthCookie(w http.ResponseWriter, token string, secure bool) {
 		MaxAge:   authCookieMaxAge,
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSiteMode(secure),
 	})
 }
 
@@ -70,7 +77,7 @@ func HandleGoogleLogin(client googleClient) http.Handler {
 			MaxAge:   300,
 			HttpOnly: true,
 			Secure:   client.IsSecure(),
-			SameSite: http.SameSiteLaxMode,
+			SameSite: sameSiteMode(client.IsSecure()),
 		})
 		http.Redirect(w, r, client.AuthCodeURL(state), http.StatusFound)
 	})
@@ -153,14 +160,15 @@ func HandleMerge(store authStore) http.Handler {
 	})
 }
 
-func HandleLogout() http.Handler {
+func HandleLogout(secure bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{ //nolint:gosec
 			Name:     "auth_token",
 			Path:     "/",
 			MaxAge:   -1,
 			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
+			Secure:   secure,
+			SameSite: sameSiteMode(secure),
 		})
 		w.WriteHeader(http.StatusNoContent)
 	})
